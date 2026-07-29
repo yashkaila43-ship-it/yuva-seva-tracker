@@ -578,9 +578,136 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
   .sync-btn .lbl{display:none;}
   .stat-grid{grid-template-columns:1fr 1fr;}
 }
+
+/* ===== Login gate ===== */
+.login-overlay{
+  position:fixed; inset:0; z-index:200;
+  background:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  padding:24px;
+}
+.login-overlay::before{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(47,111,98,0.10), transparent 45%),
+    radial-gradient(circle at 88% 88%, rgba(201,138,44,0.12), transparent 45%);
+}
+.login-card{
+  position:relative; width:100%; max-width:380px;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow-lg); padding:32px 28px 28px;
+}
+.login-brand{display:flex; align-items:center; gap:11px; margin-bottom:24px;}
+.login-brand .glyph{
+  width:40px;height:40px;border-radius:10px;
+  background:linear-gradient(155deg,var(--brand) 0%,var(--brand-dark) 100%);
+  color:#fff; display:flex; align-items:center; justify-content:center;
+  font-family:'Fraunces',serif; font-weight:700; font-size:19px;
+  box-shadow:0 3px 10px rgba(30,77,67,0.35); flex-shrink:0;
+}
+.login-brand .txt{display:flex; flex-direction:column; line-height:1.2;}
+.login-brand .txt b{font-family:'Fraunces',serif; font-size:20px; font-weight:600;}
+.login-brand .txt span{font-size:11.5px; color:var(--ink-faint);}
+.login-card h2{font-size:18px; margin-bottom:4px;}
+.login-card .sub{color:var(--ink-soft); font-size:13px; margin-bottom:22px;}
+.login-field{margin-bottom:18px;}
+.login-field label{display:block; font-size:12px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px;}
+.dob-row{display:flex; align-items:center; gap:7px;}
+.dob-row input{
+  border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2);
+  font-family:'Fraunces',serif; font-weight:600; color:var(--ink); text-align:center;
+  outline:none; transition:border-color .15s; font-size:16px; padding:10px 0;
+}
+.dob-row input#loginDay, .dob-row input#loginMonth{width:50px;}
+.dob-row input#loginYear{width:74px;}
+.dob-row span{color:var(--ink-faint); font-weight:600;}
+.dob-row input:focus{border-color:var(--brand);}
+.login-hint{font-size:11.5px; color:var(--ink-faint); margin-top:6px;}
+.pw-wrap{position:relative;}
+.pw-wrap input{
+  width:100%; border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-2);
+  padding:10px 40px 10px 12px; font-size:16px; letter-spacing:3px; font-family:'Fraunces',serif; font-weight:600;
+  color:var(--ink); outline:none; transition:border-color .15s;
+}
+.pw-wrap input:focus{border-color:var(--brand);}
+.pw-toggle{
+  position:absolute; right:4px; top:50%; transform:translateY(-50%);
+  border:none; background:transparent; cursor:pointer; padding:7px; font-size:15px; color:var(--ink-faint); line-height:1;
+}
+.remember-row{display:flex; align-items:center; gap:9px; margin-bottom:20px;}
+.remember-row input{width:16px; height:16px; accent-color:var(--brand); cursor:pointer; flex-shrink:0;}
+.remember-row label{font-size:13px; color:var(--ink-soft); cursor:pointer;}
+.login-error{
+  font-size:13px; font-weight:600; color:var(--red); background:var(--red-bg); border:1px solid var(--red-line);
+  border-radius:8px; padding:9px 12px; margin-bottom:16px; display:none;
+}
+.login-error.show{display:block;}
+.login-card .btn-primary{width:100%; justify-content:center; padding:12px;}
+.login-shake{animation:loginShake .35s;}
+@keyframes loginShake{
+  10%,90%{transform:translateX(-1px);}
+  20%,80%{transform:translateX(2px);}
+  30%,50%,70%{transform:translateX(-4px);}
+  40%,60%{transform:translateX(4px);}
+}
+.logout-btn{
+  border:1.5px solid var(--line); background:var(--surface); padding:7px 14px; border-radius:20px;
+  font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; transition:all .15s;
+}
+.logout-btn:hover{border-color:var(--red); color:var(--red);}
+@media(max-width:400px){
+  .login-card{padding:26px 20px 22px;}
+  .dob-row input#loginDay, .dob-row input#loginMonth{width:44px;}
+  .dob-row input#loginYear{width:66px;}
+}
 </style>
 </head>
 <body>
+
+<!-- ===================== LOGIN GATE ===================== -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="glyph">स</div>
+      <div class="txt"><b>Sampark</b><span>Yuva Seva Follow-up Tracker</span></div>
+    </div>
+    <h2>Sign in to continue</h2>
+    <p class="sub">Enter your login ID and password to access the tracker.</p>
+
+    <form id="loginForm" autocomplete="off">
+      <div class="login-field">
+        <label for="loginDay">Login ID (date)</label>
+        <div class="dob-row">
+          <input type="text" id="loginDay" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="DD" autocomplete="off">
+          <span>/</span>
+          <input type="text" id="loginMonth" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="MM" autocomplete="off">
+          <span>/</span>
+          <input type="text" id="loginYear" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="YYYY" autocomplete="off">
+        </div>
+        <div class="login-hint">e.g. 17 08 1953</div>
+      </div>
+
+      <div class="login-field">
+        <label for="loginPassword">Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="loginPassword" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="6-digit password" autocomplete="off">
+          <button type="button" class="pw-toggle" id="pwToggle" title="Show/hide password">👁</button>
+        </div>
+      </div>
+
+      <div class="login-error" id="loginError">Incorrect login ID or password. Please try again.</div>
+
+      <div class="remember-row">
+        <input type="checkbox" id="rememberMe">
+        <label for="rememberMe">Remember me on this device</label>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Unlock</button>
+    </form>
+  </div>
+</div>
+
+<div id="appShell" style="display:none;">
 
 <nav class="app-nav">
   <div class="nav-inner">
@@ -593,6 +720,7 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
       <button class="tab-btn" data-view="dashboard">Dashboard</button>
     </div>
     <div id="storageFlag" class="storage-flag"><span class="dot"></span> Working offline — not saved</div>
+    <button type="button" class="logout-btn" id="logoutBtn" title="Log out">Log out</button>
   </div>
 </nav>
 
@@ -845,6 +973,8 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
 </div>
 
 <div class="toast" id="toast"></div>
+
+</div><!-- /#appShell -->
 
 <script>
 /* ======================================================================
@@ -2299,7 +2429,7 @@ function escAttr(s){ return escHtml(s); }
 /* ======================================================================
    INIT
    ====================================================================== */
-(async function init(){
+async function initApp(){
   await loadSheetUrl();
   await loadAll();
   if(sheetConfigured()){
@@ -2307,6 +2437,99 @@ function escAttr(s){ return escHtml(s); }
   }
   renderRecent();
   renderDashboard();
+}
+</script>
+
+<script>
+/* ======================================================================
+   LOGIN GATE
+   ====================================================================== */
+(function(){
+  var VALID_DAY = '17';
+  var VALID_MONTH = '08';
+  var VALID_YEAR = '1953';
+  var VALID_PASSWORD = '369369';
+  var REMEMBER_KEY = 'sampark_remember_me';
+
+  var overlay = document.getElementById('loginOverlay');
+  var appShell = document.getElementById('appShell');
+  var form = document.getElementById('loginForm');
+  var dayEl = document.getElementById('loginDay');
+  var monthEl = document.getElementById('loginMonth');
+  var yearEl = document.getElementById('loginYear');
+  var pwEl = document.getElementById('loginPassword');
+  var pwToggle = document.getElementById('pwToggle');
+  var errEl = document.getElementById('loginError');
+  var rememberEl = document.getElementById('rememberMe');
+  var logoutBtn = document.getElementById('logoutBtn');
+
+  function showApp(){
+    overlay.style.display = 'none';
+    appShell.style.display = '';
+    initApp();
+  }
+
+  function digitsOnly(el, maxLen){
+    el.addEventListener('input', function(){
+      el.value = el.value.replace(/\D/g,'').slice(0, maxLen);
+    });
+  }
+  digitsOnly(dayEl, 2);
+  digitsOnly(monthEl, 2);
+  digitsOnly(yearEl, 4);
+  digitsOnly(pwEl, 6);
+
+  dayEl.addEventListener('input', function(){ if(dayEl.value.length===2) monthEl.focus(); });
+  monthEl.addEventListener('input', function(){ if(monthEl.value.length===2) yearEl.focus(); });
+  yearEl.addEventListener('input', function(){ if(yearEl.value.length===4) pwEl.focus(); });
+
+  pwToggle.addEventListener('click', function(){
+    var isPw = pwEl.type === 'password';
+    pwEl.type = isPw ? 'text' : 'password';
+    pwToggle.textContent = isPw ? '🙈' : '👁';
+  });
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var day = dayEl.value.padStart(2,'0');
+    var month = monthEl.value.padStart(2,'0');
+    var year = yearEl.value;
+    var pw = pwEl.value;
+
+    var ok = (day===VALID_DAY && month===VALID_MONTH && year===VALID_YEAR && pw===VALID_PASSWORD);
+
+    if(ok){
+      errEl.classList.remove('show');
+      if(rememberEl.checked){
+        try{ window.localStorage.setItem(REMEMBER_KEY, '1'); }catch(e){}
+      }
+      showApp();
+    } else {
+      errEl.classList.add('show');
+      var card = overlay.querySelector('.login-card');
+      card.classList.remove('login-shake');
+      void card.offsetWidth;
+      card.classList.add('login-shake');
+      pwEl.value = '';
+      pwEl.focus();
+    }
+  });
+
+  if(logoutBtn){
+    logoutBtn.addEventListener('click', function(){
+      try{ window.localStorage.removeItem(REMEMBER_KEY); }catch(e){}
+      window.location.reload();
+    });
+  }
+
+  var remembered = false;
+  try{ remembered = window.localStorage.getItem(REMEMBER_KEY) === '1'; }catch(e){}
+
+  if(remembered){
+    showApp();
+  } else {
+    dayEl.focus();
+  }
 })();
 </script>
 </body>
