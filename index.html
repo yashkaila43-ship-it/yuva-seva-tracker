@@ -163,6 +163,12 @@ button{font-family:inherit;}
 .section-block > label.block-label{font-size:12.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px; display:block; margin-bottom:10px;}
 
 .search-wrap{position:relative;}
+.search-wrap input[type=text]{
+  width:100%; border:1.5px solid var(--line); border-radius:var(--radius-sm); padding:10px 12px;
+  font-size:14.5px; font-family:inherit; color:var(--ink); background:var(--surface-2);
+  outline:none; transition:border-color .15s;
+}
+.search-wrap input[type=text]:focus{border-color:var(--brand);}
 .chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;}
 .chip{
   display:flex; align-items:center; gap:7px; background:var(--brand-light); color:var(--brand-dark);
@@ -463,6 +469,10 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
 
   .field-row{gap:12px; margin-bottom:14px;}
   .field input[type=date], .field select, .field input[type=text]{padding:10px 11px; font-size:16px;}
+  .search-wrap input[type=text]{font-size:16px; padding:10px 11px;}
+  .search-mini{font-size:16px;}
+  .period-date-input{font-size:16px;}
+  .manual-form input[type=text]{font-size:16px;}
   .seva-toggle{flex-direction:column; gap:8px;}
   .section-block{margin-top:16px; padding-top:16px;}
   .manual-form{gap:10px; padding:12px;}
@@ -480,7 +490,7 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
   .dash-subnav{flex-direction:column; align-items:stretch; gap:10px; margin-bottom:18px;}
   .pill-tabs{width:100%;}
   .pill-tabs button{flex:1; text-align:center; padding:8px 6px;}
-  .followup-select{width:100%;}
+  .followup-select{width:100%; font-size:16px;}
   .period-toggles{margin-left:0; width:100%;}
   .period-toggles button{flex:1; padding:8px 4px; font-size:11.5px;}
   .period-date-wrap{width:100%; flex-wrap:wrap; row-gap:6px;}
