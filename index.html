@@ -433,6 +433,112 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
 ::-webkit-scrollbar{width:8px; height:8px;}
 ::-webkit-scrollbar-thumb{background:#D9D2BE; border-radius:10px;}
 ::-webkit-scrollbar-track{background:transparent;}
+
+/* ======================================================================
+   MOBILE
+   ====================================================================== */
+@media(max-width:760px){
+  html{-webkit-text-size-adjust:100%;}
+  body{font-size:14px;}
+
+  /* nav */
+  .nav-inner{padding:10px 14px; gap:8px 10px; row-gap:8px;}
+  .brand-mark{flex:1 1 100%; order:1; margin-right:0;}
+  .brand-mark .glyph{width:30px; height:30px; font-size:15px; border-radius:8px;}
+  .brand-mark .txt b{font-size:16.5px;}
+  .brand-mark .txt span{font-size:10.5px;}
+  .tabs{order:2; flex:1 1 100%; width:100%;}
+  .tab-btn{flex:1; padding:8px 6px; font-size:12.5px; text-align:center;}
+  .storage-flag{order:3; font-size:10.5px; padding:4px 9px;}
+  .sync-btn{order:4; margin-left:auto; padding:6px 11px; font-size:11.5px;}
+
+  .container{padding:16px 14px 56px;}
+  .page-head{margin-bottom:16px;}
+  .page-head h1{font-size:21px;}
+  .page-head p{font-size:12.5px;}
+
+  /* cards */
+  .card{padding:16px; border-radius:10px; margin-bottom:16px;}
+  .card h2{font-size:16px;}
+
+  .field-row{gap:12px; margin-bottom:14px;}
+  .field input[type=date], .field select, .field input[type=text]{padding:10px 11px; font-size:16px;}
+  .seva-toggle{flex-direction:column; gap:8px;}
+  .section-block{margin-top:16px; padding-top:16px;}
+  .manual-form{gap:10px; padding:12px;}
+  .manual-form .field{min-width:0; flex:1 1 100%;}
+  .submit-row{margin-top:18px; gap:12px;}
+  .btn{padding:11px 18px; font-size:13.5px;}
+  .btn-primary, .submit-row .btn{width:100%; justify-content:center;}
+
+  .recent-row{gap:10px; padding:10px 0; font-size:12.5px; flex-wrap:wrap;}
+  .recent-date{width:auto; font-size:12px; order:2;}
+  .recent-mid{flex:1 1 100%; order:1;}
+  .recent-detail{white-space:normal;}
+
+  /* dashboard subnav */
+  .dash-subnav{flex-direction:column; align-items:stretch; gap:10px; margin-bottom:18px;}
+  .pill-tabs{width:100%;}
+  .pill-tabs button{flex:1; text-align:center; padding:8px 6px;}
+  .followup-select{width:100%;}
+  .period-toggles{margin-left:0; width:100%;}
+  .period-toggles button{flex:1; padding:8px 4px; font-size:11.5px;}
+  .period-date-wrap{width:100%; flex-wrap:wrap; row-gap:6px;}
+  .period-date-wrap input.period-date-input{flex:1 1 auto; min-width:0;}
+  .period-custom-wrap{width:100%; row-gap:8px;}
+  .custom-mode-toggle{width:100%;}
+  .custom-mode-btn{flex:1; text-align:center;}
+  .period-custom-day, .period-custom-range{width:100%;}
+  .period-custom-day input, .period-custom-range input{flex:1; min-width:0;}
+  .period-date-hint{margin-top:0; margin-bottom:12px;}
+
+  .stat-grid{gap:10px; margin-bottom:16px;}
+  .stat-card{padding:14px 16px;}
+  .stat-card .value{font-size:26px;}
+
+  .charts-grid{gap:12px; margin-bottom:16px;}
+  .chart-card{padding:14px;}
+  .chart-holder{height:200px;}
+  .chart-holder.short{height:170px;}
+
+  /* tables */
+  .table-card{padding:14px; margin-top:16px !important;}
+  .table-head-row{gap:8px; margin-bottom:12px;}
+  .table-head-row h3{flex:1 1 100%; font-size:14px; margin-right:0;}
+  .search-mini{flex:1 1 150px; width:auto;}
+  .filter-chip-group{flex-wrap:wrap;}
+  .filter-chip{padding:6px 10px; font-size:11.5px;}
+  .snapshot-btn{order:1;}
+  .ms-filter{order:2; flex:1 1 180px;}
+  .ms-filter-btn{width:100%; min-width:0;}
+  .ms-filter-panel{left:0; right:0; min-width:0;}
+
+  .alert-table-wrap, .combined-table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  table.alert-table{min-width:540px;}
+  table.alert-table th, table.alert-table td{padding:9px 8px; font-size:12px;}
+  .gauge{width:70px;}
+  .gauge-days{width:48px; font-size:10.5px;}
+  .combined-alert-hint{font-size:10.5px;}
+
+  .toolbar-row{gap:8px;}
+  .foot-tools{flex-direction:column; align-items:stretch; gap:8px; margin-top:20px;}
+  .foot-tools .btn{width:100%; justify-content:center;}
+
+  /* modal */
+  .modal-overlay{padding:0;}
+  .modal{max-width:100%; width:100%; max-height:100vh; height:100%; border-radius:0;}
+  .modal-head{padding:16px 18px;}
+  .modal-body{padding:12px 18px 18px;}
+  .modal-row{font-size:12.5px; gap:10px;}
+
+  .toast{bottom:16px; padding:10px 18px; font-size:12.5px; max-width:calc(100% - 32px); text-align:center;}
+}
+
+@media(max-width:400px){
+  .brand-mark .txt span{display:none;}
+  .sync-btn .lbl{display:none;}
+  .stat-grid{grid-template-columns:1fr 1fr;}
+}
 </style>
 </head>
 <body>
