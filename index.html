@@ -924,10 +924,18 @@ async function persistCustomYuvaks(){
    from a Google Sheet, so data survives even if this browser's storage
    is cleared and can be shared across devices.
    ====================================================================== */
+/* Built-in Google Sheet Web App URL — set once here so you never have to
+   paste it again. If a value is saved via the Sync panel (storage) it takes
+   priority; otherwise this default is used automatically. */
+const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyAO4KDD59oBvqrFt_DlTWRD34fHtc-od2RL6gMkSCdAtfe6LzpY1Y1bUqU4qVStLFV/exec';
+
 let sheetUrl = '';
 
+const SHEET_DISCONNECTED = '__disconnected__';
 async function loadSheetUrl(){
-  sheetUrl = (await storageGet('sampark_sheet_url')) || '';
+  const saved = await storageGet('sampark_sheet_url');
+  if(saved === SHEET_DISCONNECTED){ sheetUrl = ''; return; }
+  sheetUrl = (saved !== null && saved !== undefined && saved !== '') ? saved : DEFAULT_SHEET_URL;
 }
 function sheetConfigured(){ return !!(sheetUrl && sheetUrl.trim()); }
 
@@ -975,6 +983,19 @@ async function sheetPush(){
   }
 }
 
+/* Extra safety net: fire a best-effort sync via sendBeacon whenever the tab
+   is hidden or closed, so the latest data reaches the sheet even if a
+   regular fetch() would otherwise get cut off mid-flight. */
+function beaconSync(){
+  if(!sheetConfigured() || !navigator.sendBeacon) return;
+  try{
+    const blob = new Blob([JSON.stringify({ action:'sync', entries, customYuvaks })], {type:'text/plain;charset=UTF-8'});
+    navigator.sendBeacon(sheetUrl, blob);
+  }catch(e){ /* best effort only */ }
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') beaconSync(); });
+window.addEventListener('pagehide', beaconSync);
+
 function openSyncSettings(){
   const body = `
     <div style="display:flex;flex-direction:column;gap:14px;">
@@ -999,7 +1020,7 @@ function openSyncSettings(){
   document.getElementById('syncSaveBtn').addEventListener('click', async ()=>{
     const val = document.getElementById('syncUrlInput').value.trim();
     sheetUrl = val;
-    await storageSet('sampark_sheet_url', val);
+    await storageSet('sampark_sheet_url', val ? val : SHEET_DISCONNECTED);
     const statusEl = document.getElementById('syncStatusMsg');
     if(!val){ statusEl.textContent = 'URL cleared. Not syncing to a sheet.'; updateSyncBtn(null,'Sync'); return; }
     statusEl.textContent = 'Saving and syncing…';
@@ -1016,7 +1037,7 @@ function openSyncSettings(){
   const dc = document.getElementById('syncDisconnectBtn');
   if(dc) dc.addEventListener('click', async ()=>{
     sheetUrl = '';
-    await storageSet('sampark_sheet_url', '');
+    await storageSet('sampark_sheet_url', SHEET_DISCONNECTED);
     updateSyncBtn(null, 'Sync');
     document.getElementById('modalOverlay').classList.remove('show');
     showToast('Disconnected. Entries still save on this device only.');
