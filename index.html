@@ -947,9 +947,11 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
           <th>Follow-up</th>
           <th>Weeks</th>
           <th>Active</th>
+          <th>Grade</th>
         </tr></thead><tbody id="weeklyConsistencyBody"></tbody></table></div>
         <div class="combined-alert-hint">Each column below the follow-up name is one 7-day week, oldest on the left and this week on the right (dates shown in the column header). A week is marked ✓ if any seva — Yuva or Other — was logged in it, independent of the period selector above.
           <div class="wk-legend"><span class="week-mark active">✓</span> seva logged that week <span class="week-mark" style="margin-left:8px;">–</span> no seva that week</div>
+          <div style="margin-top:8px;">Each week is also graded on how many of its 7 days had seva logged: <strong style="color:var(--green);">A+</strong> = 5–7 days, <strong style="color:var(--green);">A</strong> = 4 days, <strong style="color:var(--amber);">B</strong> = 3 days, <strong style="color:var(--amber);">C</strong> = 2 days, <strong style="color:var(--red);">D</strong> = 1 day, <strong style="color:var(--red);">F</strong> = 0 days. The <strong>Grade</strong> column averages a follow-up's grade across all 6 weeks shown — so a follow-up that's consistently at 5+ days a week stays A+, while a mix of strong and weak weeks averages out somewhere in between.</div>
           Follow-ups are sorted with the least consistent (lowest Active count) at the top.</div>
       </div>
 
@@ -1381,10 +1383,36 @@ function weeklyActivity(followupName, numWeeks, refStr){
     const start = new Date(end); start.setDate(start.getDate()-6);
     const startStr = start.getFullYear()+'-'+String(start.getMonth()+1).padStart(2,'0')+'-'+String(start.getDate()).padStart(2,'0');
     const endStr = end.getFullYear()+'-'+String(end.getMonth()+1).padStart(2,'0')+'-'+String(end.getDate()).padStart(2,'0');
-    const active = rel.some(e=> e.date>=startStr && e.date<=endStr);
-    weeks.push({startStr, endStr, active});
+    const weekEntries = rel.filter(e=> e.date>=startStr && e.date<=endStr);
+    const active = weekEntries.length > 0;
+    const daysCount = new Set(weekEntries.map(e=>e.date)).size;
+    weeks.push({startStr, endStr, active, daysCount});
   }
   return weeks;
+}
+function gradeForDays(daysCount){
+  // Grades a single week by how many distinct days (out of 7) had seva logged.
+  // 5, 6, or 7 days all cap at the top grade — 5+ is the bar for A+.
+  const d = Math.min(daysCount, 5);
+  const scale = [
+    {letter:'F',  points:0},
+    {letter:'D',  points:1},
+    {letter:'C',  points:2},
+    {letter:'B',  points:3},
+    {letter:'A',  points:4},
+    {letter:'A+', points:5}
+  ];
+  return scale[d];
+}
+function letterForPoints(points){
+  const scale = ['F','D','C','B','A','A+'];
+  const idx = Math.max(0, Math.min(5, Math.round(points)));
+  return scale[idx];
+}
+function gradeColor(letter){
+  if(letter==='A+' || letter==='A') return 'var(--green)';
+  if(letter==='B' || letter==='C') return 'var(--amber)';
+  return 'var(--red)';
 }
 function uniqueYuvaSevaDaysAll(days, refStr){
   // Unique calendar days, across ALL follow-ups, on which Yuva Seva (only) happened.
@@ -2220,7 +2248,10 @@ function renderWeeklyConsistency(){
   const rows = FOLLOWUPS.map(f=>{
     const weeks = weeklyActivity(f, NUM_WEEKS, ref);
     const activeCount = weeks.filter(w=>w.active).length;
-    return { name:f, weeks, activeCount };
+    const weekPoints = weeks.map(w=>gradeForDays(w.daysCount).points);
+    const avgPoints = weekPoints.reduce((s,p)=>s+p,0)/NUM_WEEKS;
+    const overallLetter = letterForPoints(avgPoints);
+    return { name:f, weeks, activeCount, overallLetter };
   }).sort((a,b)=> a.activeCount - b.activeCount || a.name.localeCompare(b.name));
 
   // Column headers: each week's short end-date, so it's clear which week is which
@@ -2230,18 +2261,18 @@ function renderWeeklyConsistency(){
   const headCells = headWeeks.map(w=>
     `<th class="week-col-head" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}">${shortDate(w.endStr)}</th>`
   ).join('');
-  document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th>Active</th>`;
+  document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th>Active</th><th>Grade</th>`;
 
   const body = rows.map(r=>{
     const cells = r.weeks.map(w=>
-      `<td><span class="week-mark${w.active?' active':''}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.active?'Seva logged':'No seva logged'}">${w.active?'✓':'–'}</span></td>`
+      `<td><span class="week-mark${w.active?' active':''}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.daysCount} day(s) of seva — grade ${gradeForDays(w.daysCount).letter}">${w.active?'✓':'–'}</span></td>`
     ).join('');
     const frac = r.activeCount/NUM_WEEKS;
     const color = frac>=0.66 ? 'var(--green)' : (frac>=0.33 ? 'var(--amber)' : 'var(--red)');
-    return `<tr><td class="nm">${escHtml(r.name)}</td>${cells}<td><strong style="color:${color};">${r.activeCount}/${NUM_WEEKS}</strong></td></tr>`;
+    return `<tr><td class="nm">${escHtml(r.name)}</td>${cells}<td><strong style="color:${color};">${r.activeCount}/${NUM_WEEKS}</strong></td><td><strong style="color:${gradeColor(r.overallLetter)};">${r.overallLetter}</strong></td></tr>`;
   }).join('');
 
-  document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+2}" style="text-align:center;color:var(--ink-soft);">No follow-ups</td></tr>`;
+  document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+3}" style="text-align:center;color:var(--ink-soft);">No follow-ups</td></tr>`;
   document.getElementById('weeklyConsistencyTitle').textContent = `Weekly Consistency — Last ${NUM_WEEKS} Weeks (as of ${fmtDate(ref)})`;
 }
 
