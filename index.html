@@ -392,7 +392,7 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
 .week-dot{width:14px; height:14px; border-radius:4px; background:var(--line-soft); border:1px solid var(--line); flex-shrink:0;}
 .week-dot.active{background:var(--green); border-color:var(--green);}
 
-.week-mark{display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:5px; background:var(--surface-2); border:1px solid var(--line); color:var(--ink-faint); font-size:11px; font-weight:800; flex-shrink:0;}
+.week-mark{display:inline-flex; align-items:center; justify-content:center; min-width:24px; height:20px; padding:0 4px; border-radius:5px; background:var(--surface-2); border:1px solid var(--line); color:var(--ink-faint); font-size:11px; font-weight:800; flex-shrink:0;}
 .week-mark.active{background:var(--green-bg); border-color:var(--green-line); color:var(--green);}
 th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:700; white-space:nowrap;}
 .wk-legend{display:inline-flex; align-items:center; gap:6px; margin:6px 0 0; flex-wrap:wrap;}
@@ -950,8 +950,13 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
 
       <div class="table-card" style="margin-top:20px;">
         <div class="table-head-row">
-          <h3 id="weeklyConsistencyTitle">Weekly Consistency — Last 6 Weeks</h3>
+          <h3 id="weeklyConsistencyTitle">Weekly Consistency — Last 4 Weeks</h3>
           <button type="button" class="snapshot-btn" id="weeklyConsistencySnapBtn" title="Copy snapshot to share">📷</button>
+          <div class="period-date-wrap" style="display:flex; align-items:center; gap:6px;">
+            <label for="weeklyConsistencyRefDate" style="font-size:12px; color:var(--ink-soft); white-space:nowrap;">Week ending</label>
+            <input type="date" id="weeklyConsistencyRefDate" class="period-date-input">
+            <button type="button" class="snapshot-btn" id="weeklyConsistencyRefDateReset" title="Reset to this week">↺</button>
+          </div>
           <div class="ms-filter" id="weeklyConsistencyFollowupFilter">
             <button type="button" class="ms-filter-btn" id="weeklyConsistencyFollowupBtn">All Follow-ups <span class="ms-arrow">▾</span></button>
             <div class="ms-filter-panel" id="weeklyConsistencyFollowupPanel">
@@ -969,9 +974,8 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
           <th>Active</th>
           <th>Grade</th>
         </tr></thead><tbody id="weeklyConsistencyBody"></tbody></table></div>
-        <div class="combined-alert-hint">Each column below the follow-up name is one 7-day week, oldest on the left and this week on the right (dates shown in the column header). A week is marked ✓ if any seva — Yuva or Other — was logged in it, independent of the period selector above.
-          <div class="wk-legend"><span class="week-mark active">✓</span> seva logged that week <span class="week-mark" style="margin-left:8px;">–</span> no seva that week</div>
-          <div style="margin-top:8px;">Each week is also graded on how many of its 7 days had seva logged: <strong style="color:var(--green);">A+</strong> = 5–7 days, <strong style="color:var(--green);">A</strong> = 4 days, <strong style="color:var(--amber);">B</strong> = 3 days, <strong style="color:var(--amber);">C</strong> = 2 days, <strong style="color:var(--red);">D</strong> = 1 day, <strong style="color:var(--red);">F</strong> = 0 days. The <strong>Grade</strong> column averages a follow-up's grade across all 6 weeks shown — so a follow-up that's consistently at 5+ days a week stays A+, while a mix of strong and weak weeks averages out somewhere in between.</div>
+        <div class="combined-alert-hint">Each column below the follow-up name is one Monday–Sunday calendar week, oldest on the left and the most recent on the right (dates shown in the column header). Use the "Week ending" picker above to shift this 4-week range — it only affects this report and never changes the Alert List or any other report above.
+          <div style="margin-top:8px;">Each week cell shows that week's letter grade, based on how many of its 7 days (Mon–Sun) had seva logged: <strong style="color:var(--green);">A+</strong> = 5–7 days, <strong style="color:var(--green);">A</strong> = 4 days, <strong style="color:var(--amber);">B</strong> = 3 days, <strong style="color:var(--amber);">C</strong> = 2 days, <strong style="color:var(--red);">D</strong> = 1 day. A dash (<strong>–</strong>) means no seva was logged that week. The <strong>Grade</strong> column averages a follow-up's grade across all 4 weeks shown — so a follow-up that's consistently at 5+ days a week stays A+, while a mix of strong and weak weeks averages out somewhere in between.</div>
           Follow-ups are sorted with the least consistent (lowest Active count) at the top.</div>
       </div>
 
@@ -1064,6 +1068,10 @@ let customSubMode = 'day';        // which custom control is currently showing: 
 let customSingleDate = todayStr();
 let customEndDate = todayStr();
 let customStartDate = (function(){ const d = parseDateStr(todayStr()); d.setDate(d.getDate()-6); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+
+// Reference date for the Weekly Consistency report only — completely separate
+// from periodEndDate/periodMode above, so changing it never affects any other report.
+let weeklyConsistencyRefDate = todayStr();
 let indFilterState = 'all';
 let allFilterState = 'all';
 let charts = {};
@@ -1393,14 +1401,24 @@ function prevPeriodEndStr(){
   s.setDate(s.getDate()-1);
   return s.getFullYear()+'-'+String(s.getMonth()+1).padStart(2,'0')+'-'+String(s.getDate()).padStart(2,'0');
 }
+function mondayOnOrBefore(date){
+  // Returns the Monday of the calendar week containing `date` (Mon–Sun weeks).
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const diff = (day === 0 ? -6 : 1 - day);
+  d.setDate(d.getDate() + diff);
+  return d;
+}
 function weeklyActivity(followupName, numWeeks, refStr){
-  // Rolling 7-day windows ending at refStr, going back numWeeks weeks (oldest first).
+  // Fixed Monday–Sunday calendar weeks, going back numWeeks weeks (oldest first).
+  // The most recent column is the Mon–Sun week that contains refStr.
   const ref = parseDateStr(refStr || todayStr());
+  const refMonday = mondayOnOrBefore(ref);
   const rel = relevantEntries(followupName);
   const weeks = [];
   for(let w = numWeeks-1; w>=0; w--){
-    const end = new Date(ref); end.setDate(end.getDate() - w*7);
-    const start = new Date(end); start.setDate(start.getDate()-6);
+    const start = new Date(refMonday); start.setDate(start.getDate() - w*7);
+    const end = new Date(start); end.setDate(end.getDate()+6);
     const startStr = start.getFullYear()+'-'+String(start.getMonth()+1).padStart(2,'0')+'-'+String(start.getDate()).padStart(2,'0');
     const endStr = end.getFullYear()+'-'+String(end.getMonth()+1).padStart(2,'0')+'-'+String(end.getDate()).padStart(2,'0');
     const weekEntries = rel.filter(e=> e.date>=startStr && e.date<=endStr);
@@ -1433,6 +1451,11 @@ function gradeColor(letter){
   if(letter==='A+' || letter==='A') return 'var(--green)';
   if(letter==='B' || letter==='C') return 'var(--amber)';
   return 'var(--red)';
+}
+function gradeBoxStyle(letter){
+  if(letter==='A+' || letter==='A') return 'background:var(--green-bg);border-color:var(--green-line);color:var(--green);';
+  if(letter==='B' || letter==='C') return 'background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber);';
+  return 'background:var(--red-bg);border-color:var(--red-line);color:var(--red);';
 }
 function uniqueYuvaSevaDaysAll(days, refStr){
   // Unique calendar days, across ALL follow-ups, on which Yuva Seva (only) happened.
@@ -2015,6 +2038,23 @@ document.getElementById('weeklyConsistencyFollowupFilter').querySelectorAll('.ms
   });
 });
 
+/* --- week-range ("as of") picker for the Weekly Consistency report only ---
+   Fully independent of periodEndDate/periodMode used by the reports above,
+   so changing it never affects any other report on the page. */
+const weeklyConsistencyRefDateInput = document.getElementById('weeklyConsistencyRefDate');
+weeklyConsistencyRefDateInput.max = todayStr();
+weeklyConsistencyRefDateInput.value = weeklyConsistencyRefDate;
+weeklyConsistencyRefDateInput.addEventListener('change', ()=>{
+  if(!weeklyConsistencyRefDateInput.value) return;
+  weeklyConsistencyRefDate = weeklyConsistencyRefDateInput.value;
+  renderWeeklyConsistency();
+});
+document.getElementById('weeklyConsistencyRefDateReset').addEventListener('click', ()=>{
+  weeklyConsistencyRefDate = todayStr();
+  weeklyConsistencyRefDateInput.value = weeklyConsistencyRefDate;
+  renderWeeklyConsistency();
+});
+
 function alertBreakdownFor(followupName){
   return rosterFor(followupName).map(y=>{
     const lastMet = globalLastMet(y.fullName);
@@ -2311,8 +2351,8 @@ function renderCombinedReports(){
 }
 
 function renderWeeklyConsistency(){
-  const NUM_WEEKS = 6;
-  const ref = effEnd();
+  const NUM_WEEKS = 4;
+  const ref = weeklyConsistencyRefDate;
   const allSelected = weeklyConsistencyFollowupSelected.size === FOLLOWUPS.length;
   const followupsToShow = allSelected ? FOLLOWUPS : FOLLOWUPS.filter(f=>weeklyConsistencyFollowupSelected.has(f));
   const rows = followupsToShow.map(f=>{
@@ -2334,9 +2374,12 @@ function renderWeeklyConsistency(){
   document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th>Active</th><th>Grade</th>`;
 
   const body = rows.map(r=>{
-    const cells = r.weeks.map(w=>
-      `<td><span class="week-mark${w.active?' active':''}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.daysCount} day(s) of seva — grade ${gradeForDays(w.daysCount).letter}">${w.active?'✓':'–'}</span></td>`
-    ).join('');
+    const cells = r.weeks.map(w=>{
+      const letter = gradeForDays(w.daysCount).letter;
+      const label = w.active ? letter : '-';
+      const style = w.active ? gradeBoxStyle(letter) : '';
+      return `<td><span class="week-mark" style="${style}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.daysCount} day(s) of seva — grade ${letter}">${label}</span></td>`;
+    }).join('');
     const frac = r.activeCount/NUM_WEEKS;
     const color = frac>=0.66 ? 'var(--green)' : (frac>=0.33 ? 'var(--amber)' : 'var(--red)');
     return `<tr><td class="nm">${escHtml(r.name)}</td>${cells}<td><strong style="color:${color};">${r.activeCount}/${NUM_WEEKS}</strong></td><td><strong style="color:${gradeColor(r.overallLetter)};">${r.overallLetter}</strong></td></tr>`;
