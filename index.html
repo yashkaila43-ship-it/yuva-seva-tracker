@@ -388,6 +388,10 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
 .pill-medium{background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-line);}
 .pill-good{background:var(--green-bg); color:var(--green); border:1px solid var(--green-line);}
 
+.week-dots{display:inline-flex; gap:4px; align-items:center; justify-content:center;}
+.week-dot{width:14px; height:14px; border-radius:4px; background:var(--line-soft); border:1px solid var(--line); flex-shrink:0;}
+.week-dot.active{background:var(--green); border-color:var(--green);}
+
 .toolbar-row{display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;}
 
 /* modal */
@@ -558,6 +562,8 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
   .combined-table-wrap table.alert-table th .sort-arrow{margin-left:2px; font-size:9.5px;}
   .combined-table-wrap table.alert-table td{padding:8px 3px; font-size:11.5px;}
   .combined-table-wrap table.alert-table td.nm, .combined-table-wrap table.alert-table td:first-child{font-weight:600;}
+  .week-dots{gap:2.5px; flex-wrap:wrap;}
+  .week-dot{width:9px; height:9px; border-radius:3px;}
 
   .toolbar-row{gap:8px;}
   .foot-tools{flex-direction:column; align-items:stretch; gap:8px; margin-top:20px;}
@@ -887,7 +893,9 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
           <th class="sortable" data-sort="yuvaDays">Yuva Seva Days<span class="sort-arrow">⇅</span></th>
           <th class="sortable" data-sort="otherDays">Other Seva Days<span class="sort-arrow">⇅</span></th>
           <th class="sortable" data-sort="total">Total Seva Days<span class="sort-arrow">⇅</span></th>
+          <th class="sortable" data-sort="daysSinceSeva">Last Seva<span class="sort-arrow">⇅</span></th>
         </tr></thead><tbody id="combinedSevaBody"></tbody></table></div>
+        <div class="combined-alert-hint">Trend arrows next to the Total compare this period's days to the immediately preceding period of equal length. "Last Seva" reflects the most recent entry as of today, regardless of the period selected above.</div>
       </div>
 
       <div class="table-card" style="margin-top:20px;">
@@ -905,8 +913,21 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
             </div>
           </div>
         </div>
-        <div class="combined-table-wrap"><table class="alert-table"><thead><tr><th>Follow-up</th><th>Assigned Yuvaks</th><th>Met</th><th>Not Met</th></tr></thead><tbody id="combinedMetBody"></tbody></table></div>
-        <div class="combined-alert-hint">Tap a Met or Not Met number to see the yuvak names for that follow-up.</div>
+        <div class="combined-table-wrap"><table class="alert-table"><thead><tr><th>Follow-up</th><th>Assigned Yuvaks</th><th>Met</th><th>Not Met</th><th>Coverage %</th></tr></thead><tbody id="combinedMetBody"></tbody></table></div>
+        <div class="combined-alert-hint">Tap a Met or Not Met number to see the yuvak names for that follow-up. Coverage % = Met ÷ Assigned, so follow-ups with different roster sizes stay comparable.</div>
+      </div>
+
+      <div class="table-card" style="margin-top:20px;">
+        <div class="table-head-row">
+          <h3 id="weeklyConsistencyTitle">Weekly Consistency — Last 6 Weeks</h3>
+          <button type="button" class="snapshot-btn" id="weeklyConsistencySnapBtn" title="Copy snapshot to share">📷</button>
+        </div>
+        <div class="combined-table-wrap"><table class="alert-table" id="weeklyConsistencyTable"><thead><tr>
+          <th>Follow-up</th>
+          <th>Weeks</th>
+          <th>Active</th>
+        </tr></thead><tbody id="weeklyConsistencyBody"></tbody></table></div>
+        <div class="combined-alert-hint">A week counts as active if any seva (Yuva or Other) was logged in that 7-day window — independent of the period selector above. Sorted least-consistent first.</div>
       </div>
 
       <div class="table-card" style="margin-top:20px;">
@@ -1304,6 +1325,43 @@ function alertStatusFor(lastMetDate){
   if(d===null || d>20) return 'high';
   if(d>=10) return 'medium';
   return 'good';
+}
+function neverMetList(){
+  // Yuvaks with no Yuva Seva entry EVER (lifetime, not period-scoped) —
+  // the highest-risk group since they're not in anyone's active loop yet.
+  return allYuvaks()
+    .filter(y=>globalLastMet(y.fullName)===null)
+    .map(y=>({fullName:y.fullName, followupName:y.followupName}))
+    .sort((a,b)=> a.followupName===b.followupName ? a.fullName.localeCompare(b.fullName) : a.followupName.localeCompare(b.followupName));
+}
+function lastSevaDateFor(followupName){
+  // Most recent seva entry (either type) by this follow-up, lifetime —
+  // always measured against today, same convention as the yuvak Alert List.
+  let last = null;
+  relevantEntries(followupName).forEach(e=>{ if(!last || e.date>last) last = e.date; });
+  return last;
+}
+function prevPeriodEndStr(){
+  // The day immediately before the current window starts — so the "previous
+  // period" is the same length, ending right where the current one begins.
+  const s = parseDateStr(effStart());
+  s.setDate(s.getDate()-1);
+  return s.getFullYear()+'-'+String(s.getMonth()+1).padStart(2,'0')+'-'+String(s.getDate()).padStart(2,'0');
+}
+function weeklyActivity(followupName, numWeeks, refStr){
+  // Rolling 7-day windows ending at refStr, going back numWeeks weeks (oldest first).
+  const ref = parseDateStr(refStr || todayStr());
+  const rel = relevantEntries(followupName);
+  const weeks = [];
+  for(let w = numWeeks-1; w>=0; w--){
+    const end = new Date(ref); end.setDate(end.getDate() - w*7);
+    const start = new Date(end); start.setDate(start.getDate()-6);
+    const startStr = start.getFullYear()+'-'+String(start.getMonth()+1).padStart(2,'0')+'-'+String(start.getDate()).padStart(2,'0');
+    const endStr = end.getFullYear()+'-'+String(end.getMonth()+1).padStart(2,'0')+'-'+String(end.getDate()).padStart(2,'0');
+    const active = rel.some(e=> e.date>=startStr && e.date<=endStr);
+    weeks.push({startStr, endStr, active});
+  }
+  return weeks;
 }
 function uniqueYuvaSevaDaysAll(days, refStr){
   // Unique calendar days, across ALL follow-ups, on which Yuva Seva (only) happened.
@@ -1954,10 +2012,12 @@ function renderOverview(){
   const uniqDays = uniqueYuvaSevaDaysAll(effDays(), effEnd());
   const uniqNS = uniqueNSOnFieldCount(effDays(), effEnd());
   const uniqYuvaks = uniqueYuvaksMetCount(effDays(), effEnd());
+  const neverMet = neverMetList();
 
   document.getElementById('ovStats').innerHTML =
     statCardHtml('','Total Entries', entries.length, 'All-time seva records') +
     statCardHtml('','Yuvaks Tracked', roster.length, 'Across '+FOLLOWUPS.length+' follow-ups') +
+    statCardHtml('cardNeverMet','Never Met — Ever', neverMet.length, 'Not in anyone\'s loop yet · Tap to view', true, 'red') +
     statCardHtml('','High Alerts', high, 'Not met in over 20 days', false, 'red') +
     statCardHtml('','On Track', good, 'Met within last 10 days', false, 'green') +
     `<div class="stat-card stat-card-stack">
@@ -2019,21 +2079,36 @@ function renderOverview(){
       plugins:{ legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}} } }
   });
 
+  document.getElementById('cardNeverMet').addEventListener('click', ()=> openModal(
+    'Never Met — Ever (All Follow-ups)',
+    neverMet.length===0 ? '<div class="modal-empty">Every tracked yuvak has been met at least once.</div>' :
+      neverMet.map(y=>`<div class="modal-row"><span class="l">${escHtml(y.fullName)}</span><span class="r">${escHtml(y.followupName)}</span></div>`).join('')
+  ));
+
   renderAlertTable('alertBodyAll', roster.map(y=>({...y, followupDisplay:y.followupName})), true, allFilterState, document.getElementById('alertSearchAll').value);
 
   renderCombinedReports();
   renderCombinedAlertReport();
+  renderWeeklyConsistency();
 }
 
 function renderCombinedReports(){
+  const prevEnd = prevPeriodEndStr();
   const data = FOLLOWUPS.map(f=>{
     const yuvaDays = yuvaSevaDaysCount(f, effDays(), effEnd());
     const otherDays = otherSevaDaysCount(f, effDays(), effEnd());
     const total = combinedSevaDaysCount(f, effDays(), effEnd());
+    const prevTotal = combinedSevaDaysCount(f, effDays(), prevEnd);
+    const trend = total - prevTotal;
     const roster = rosterFor(f);
     const met = yuvaksMetList(f, effDays(), effEnd()).length;
     const notMet = yuvaksNotMetList(f, effDays(), effEnd()).length;
-    return { name:f, yuvaDays, otherDays, total, assigned:roster.length, met, notMet };
+    const coverage = roster.length ? Math.round((met/roster.length)*100) : null;
+    const lastSevaDate = lastSevaDateFor(f);
+    const daysSinceRaw = daysSince(lastSevaDate);
+    const daysSinceSeva = daysSinceRaw===null ? 99999 : daysSinceRaw;
+    const sevaStatus = alertStatusFor(lastSevaDate);
+    return { name:f, yuvaDays, otherDays, total, trend, assigned:roster.length, met, notMet, coverage, lastSevaDate, daysSinceSeva, sevaStatus };
   });
 
   const allSelected = combinedFollowupSelected.size === FOLLOWUPS.length;
@@ -2046,26 +2121,42 @@ function renderCombinedReports(){
   }
 
   const sevaNumCell = (fu, kind, val) => `<span class="num-link${val===0?' num-zero':''}" data-fu="${escAttr(fu)}" data-kind="${kind}">${val}</span>`;
+  const trendHtml = (t) => {
+    if(t>0) return `<span style="color:var(--green); font-size:11px; font-weight:700; margin-left:5px;">▲${t}</span>`;
+    if(t<0) return `<span style="color:var(--red); font-size:11px; font-weight:700; margin-left:5px;">▼${Math.abs(t)}</span>`;
+    return `<span style="color:var(--ink-faint); font-size:11px; margin-left:5px;">–0</span>`;
+  };
+  const lastSevaHtml = (d) => {
+    const label = d.lastSevaDate===null ? 'Never' : (d.daysSinceSeva===0 ? 'Today' : d.daysSinceSeva+'d ago');
+    return `<span class="pill pill-${d.sevaStatus}">${label}</span>`;
+  };
 
-  let rows1 = sevaRows.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${sevaNumCell(d.name,'yuva',d.yuvaDays)}</td><td>${sevaNumCell(d.name,'other',d.otherDays)}</td><td><strong>${d.total}</strong></td></tr>`).join('');
+  let rows1 = sevaRows.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${sevaNumCell(d.name,'yuva',d.yuvaDays)}</td><td>${sevaNumCell(d.name,'other',d.otherDays)}</td><td><strong>${d.total}</strong>${trendHtml(d.trend)}</td><td>${lastSevaHtml(d)}</td></tr>`).join('');
   const metNumCell = (fu, kind, val) => `<span class="num-link${val===0?' num-zero':''}" data-fu="${escAttr(fu)}" data-kind="${kind}" style="color:${kind==='met'?'var(--green)':'var(--red)'};">${val}</span>`;
+  const coverageHtml = (d) => {
+    if(d.coverage===null) return '—';
+    const color = d.coverage>=75 ? 'var(--green)' : (d.coverage>=40 ? 'var(--amber)' : 'var(--red)');
+    return `<strong style="color:${color};">${d.coverage}%</strong>`;
+  };
 
-  let rows2 = filtered.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${d.assigned}</td><td>${metNumCell(d.name,'met',d.met)}</td><td>${metNumCell(d.name,'notmet',d.notMet)}</td></tr>`).join('');
+  let rows2 = filtered.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${d.assigned}</td><td>${metNumCell(d.name,'met',d.met)}</td><td>${metNumCell(d.name,'notmet',d.notMet)}</td><td>${coverageHtml(d)}</td></tr>`).join('');
 
   if(filtered.length > 0){
     const totalLabel = allSelected ? 'All Follow-ups' : 'Selected Total';
     const totalYuva = filtered.reduce((s,d)=>s+d.yuvaDays,0);
     const totalOther = filtered.reduce((s,d)=>s+d.otherDays,0);
     const totalAll = filtered.reduce((s,d)=>s+d.total,0);
+    const totalTrend = filtered.reduce((s,d)=>s+d.trend,0);
     const totalAssigned = filtered.reduce((s,d)=>s+d.assigned,0);
     const totalMet = filtered.reduce((s,d)=>s+d.met,0);
     const totalNotMet = filtered.reduce((s,d)=>s+d.notMet,0);
-    rows1 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalYuva}</td><td>${totalOther}</td><td>${totalAll}</td></tr>`;
-    rows2 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalAssigned}</td><td style="color:var(--green);">${totalMet}</td><td style="color:var(--red);">${totalNotMet}</td></tr>`;
+    const totalCoverage = totalAssigned ? Math.round((totalMet/totalAssigned)*100) : null;
+    rows1 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalYuva}</td><td>${totalOther}</td><td>${totalAll}${trendHtml(totalTrend)}</td><td>—</td></tr>`;
+    rows2 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalAssigned}</td><td style="color:var(--green);">${totalMet}</td><td style="color:var(--red);">${totalNotMet}</td><td>${totalCoverage===null?'—':coverageHtml({coverage:totalCoverage})}</td></tr>`;
   }
 
-  document.getElementById('combinedSevaBody').innerHTML = rows1 || `<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
-  document.getElementById('combinedMetBody').innerHTML = rows2 || `<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
+  document.getElementById('combinedSevaBody').innerHTML = rows1 || `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
+  document.getElementById('combinedMetBody').innerHTML = rows2 || `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
 
   const suffix = allSelected ? 'All Follow-ups' : (filtered.length===1 ? filtered[0].name : `${filtered.length} Follow-ups Selected`);
   document.getElementById('combinedSevaTitle').textContent = `Combined Seva Report — ${suffix} (${periodTagWithDate()})`;
@@ -2089,6 +2180,28 @@ function renderCombinedReports(){
   document.querySelectorAll('#combinedMetBody .num-link:not(.num-zero)').forEach(el=>{
     el.addEventListener('click', ()=> openMetDrilldown(el.dataset.fu, el.dataset.kind));
   });
+}
+
+function renderWeeklyConsistency(){
+  const NUM_WEEKS = 6;
+  const ref = effEnd();
+  const rows = FOLLOWUPS.map(f=>{
+    const weeks = weeklyActivity(f, NUM_WEEKS, ref);
+    const activeCount = weeks.filter(w=>w.active).length;
+    return { name:f, weeks, activeCount };
+  }).sort((a,b)=> a.activeCount - b.activeCount || a.name.localeCompare(b.name));
+
+  const body = rows.map(r=>{
+    const dots = r.weeks.map(w=>
+      `<span class="week-dot${w.active?' active':''}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.active?'Active':'No seva'}"></span>`
+    ).join('');
+    const frac = r.activeCount/NUM_WEEKS;
+    const color = frac>=0.66 ? 'var(--green)' : (frac>=0.33 ? 'var(--amber)' : 'var(--red)');
+    return `<tr><td class="nm">${escHtml(r.name)}</td><td><div class="week-dots">${dots}</div></td><td><strong style="color:${color};">${r.activeCount}/${NUM_WEEKS}</strong></td></tr>`;
+  }).join('');
+
+  document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="3" style="text-align:center;color:var(--ink-soft);">No follow-ups</td></tr>`;
+  document.getElementById('weeklyConsistencyTitle').textContent = `Weekly Consistency — Last ${NUM_WEEKS} Weeks (as of ${fmtDate(ref)})`;
 }
 
 function openMetDrilldown(followupName, kind){
@@ -2384,6 +2497,9 @@ document.getElementById('combinedMetSnapBtn').addEventListener('click', function
 });
 document.getElementById('combinedAlertSnapBtn').addEventListener('click', function(){
   copyCardSnapshot(this.closest('.table-card'), this, 'combined_alert_report');
+});
+document.getElementById('weeklyConsistencySnapBtn').addEventListener('click', function(){
+  copyCardSnapshot(this.closest('.table-card'), this, 'weekly_consistency');
 });
 
 /* ======================================================================
