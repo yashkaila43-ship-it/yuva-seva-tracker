@@ -1259,6 +1259,15 @@ function otherSevaList(followupName, days, refStr){
 function otherSevaDaysCount(followupName, days, refStr){
   return new Set(otherSevaList(followupName,days,refStr).map(e=>e.date)).size;
 }
+function combinedSevaDaysCount(followupName, days, refStr){
+  // Union of dates that have a Yuva Seva and/or Other Seva entry.
+  // A day with BOTH types logged still counts as just one day here.
+  const set = new Set();
+  relevantEntries(followupName).forEach(e=>{
+    if((e.sevaType==='yuva' || e.sevaType==='other') && withinLastNDays(e.date, days, refStr)) set.add(e.date);
+  });
+  return set.size;
+}
 function yuvaksMetList(followupName, days, refStr){
   const map = new Map();
   relevantEntries(followupName).forEach(e=>{
@@ -2020,7 +2029,7 @@ function renderCombinedReports(){
   const data = FOLLOWUPS.map(f=>{
     const yuvaDays = yuvaSevaDaysCount(f, effDays(), effEnd());
     const otherDays = otherSevaDaysCount(f, effDays(), effEnd());
-    const total = yuvaDays + otherDays;
+    const total = combinedSevaDaysCount(f, effDays(), effEnd());
     const roster = rosterFor(f);
     const met = yuvaksMetList(f, effDays(), effEnd()).length;
     const notMet = yuvaksNotMetList(f, effDays(), effEnd()).length;
@@ -2047,7 +2056,7 @@ function renderCombinedReports(){
     const totalLabel = allSelected ? 'All Follow-ups' : 'Selected Total';
     const totalYuva = filtered.reduce((s,d)=>s+d.yuvaDays,0);
     const totalOther = filtered.reduce((s,d)=>s+d.otherDays,0);
-    const totalAll = totalYuva + totalOther;
+    const totalAll = filtered.reduce((s,d)=>s+d.total,0);
     const totalAssigned = filtered.reduce((s,d)=>s+d.assigned,0);
     const totalMet = filtered.reduce((s,d)=>s+d.met,0);
     const totalNotMet = filtered.reduce((s,d)=>s+d.notMet,0);
