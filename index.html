@@ -909,6 +909,16 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
         <div class="table-head-row">
           <h3 id="yuvaTrendTitle">Yuva Seva Trend — All Follow-ups</h3>
           <button type="button" class="snapshot-btn" id="yuvaTrendSnapBtn" title="Copy snapshot to share">📷</button>
+          <div class="ms-filter" id="yuvaTrendFollowupFilter">
+            <button type="button" class="ms-filter-btn" id="yuvaTrendFollowupBtn">All Follow-ups <span class="ms-arrow">▾</span></button>
+            <div class="ms-filter-panel" id="yuvaTrendFollowupPanel">
+              <div class="ms-filter-actions">
+                <button type="button" data-act="all">Select All</button>
+                <button type="button" data-act="none">Clear</button>
+              </div>
+              <div class="ms-filter-list" id="yuvaTrendFollowupList"></div>
+            </div>
+          </div>
         </div>
         <div class="combined-table-wrap"><table class="alert-table" id="yuvaTrendTable"><thead><tr>
           <th>Follow-up</th>
@@ -942,6 +952,16 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
         <div class="table-head-row">
           <h3 id="weeklyConsistencyTitle">Weekly Consistency — Last 6 Weeks</h3>
           <button type="button" class="snapshot-btn" id="weeklyConsistencySnapBtn" title="Copy snapshot to share">📷</button>
+          <div class="ms-filter" id="weeklyConsistencyFollowupFilter">
+            <button type="button" class="ms-filter-btn" id="weeklyConsistencyFollowupBtn">All Follow-ups <span class="ms-arrow">▾</span></button>
+            <div class="ms-filter-panel" id="weeklyConsistencyFollowupPanel">
+              <div class="ms-filter-actions">
+                <button type="button" data-act="all">Select All</button>
+                <button type="button" data-act="none">Clear</button>
+              </div>
+              <div class="ms-filter-list" id="weeklyConsistencyFollowupList"></div>
+            </div>
+          </div>
         </div>
         <div class="combined-table-wrap"><table class="alert-table" id="weeklyConsistencyTable"><thead><tr id="weeklyConsistencyHead">
           <th>Follow-up</th>
@@ -1821,7 +1841,8 @@ indSelect.value = FOLLOWUPS[0];
 let combinedFollowupSelected = new Set(FOLLOWUPS);
 const combinedFollowupPanels = [
   { list: document.getElementById('combinedFollowupList'), btn: document.getElementById('combinedFollowupBtn'), panel: document.getElementById('combinedFollowupPanel'), filterEl: document.getElementById('combinedFollowupFilter') },
-  { list: document.getElementById('combinedMetFollowupList'), btn: document.getElementById('combinedMetFollowupBtn'), panel: document.getElementById('combinedMetFollowupPanel'), filterEl: document.getElementById('combinedMetFollowupFilter') }
+  { list: document.getElementById('combinedMetFollowupList'), btn: document.getElementById('combinedMetFollowupBtn'), panel: document.getElementById('combinedMetFollowupPanel'), filterEl: document.getElementById('combinedMetFollowupFilter') },
+  { list: document.getElementById('yuvaTrendFollowupList'), btn: document.getElementById('yuvaTrendFollowupBtn'), panel: document.getElementById('yuvaTrendFollowupPanel'), filterEl: document.getElementById('yuvaTrendFollowupFilter') }
 ];
 
 function syncCombinedFollowupCheckboxes(){
@@ -1944,6 +1965,53 @@ document.querySelectorAll('#combinedAlertTable th.sortable').forEach(th=>{
     else if(combinedAlertSortState.dir === 'desc'){ combinedAlertSortState.dir = 'asc'; }
     else { combinedAlertSortState = { col:null, dir:null }; }
     renderCombinedAlertReport();
+  });
+});
+
+/* --- weekly consistency: multi-select follow-up filter --- */
+let weeklyConsistencyFollowupSelected = new Set(FOLLOWUPS);
+const weeklyConsistencyFollowupList = document.getElementById('weeklyConsistencyFollowupList');
+const weeklyConsistencyFollowupBtn = document.getElementById('weeklyConsistencyFollowupBtn');
+const weeklyConsistencyFollowupPanel = document.getElementById('weeklyConsistencyFollowupPanel');
+
+FOLLOWUPS.forEach(f=>{
+  const item = document.createElement('label');
+  item.className = 'ms-filter-item';
+  item.innerHTML = `<input type="checkbox" value="${escAttr(f)}" checked> <span>${escHtml(f)}</span>`;
+  item.querySelector('input').addEventListener('change', e=>{
+    if(e.target.checked) weeklyConsistencyFollowupSelected.add(f); else weeklyConsistencyFollowupSelected.delete(f);
+    updateWeeklyConsistencyFollowupBtnLabel();
+    renderWeeklyConsistency();
+  });
+  weeklyConsistencyFollowupList.appendChild(item);
+});
+
+function updateWeeklyConsistencyFollowupBtnLabel(){
+  const n = weeklyConsistencyFollowupSelected.size;
+  let label;
+  if(n === 0) label = 'None selected';
+  else if(n === FOLLOWUPS.length) label = 'All Follow-ups';
+  else if(n === 1) label = [...weeklyConsistencyFollowupSelected][0];
+  else label = `${n} selected`;
+  weeklyConsistencyFollowupBtn.childNodes[0].textContent = label + ' ';
+}
+
+weeklyConsistencyFollowupBtn.addEventListener('click', e=>{
+  e.stopPropagation();
+  weeklyConsistencyFollowupPanel.classList.toggle('show');
+});
+document.addEventListener('click', e=>{
+  if(!weeklyConsistencyFollowupPanel.contains(e.target) && e.target !== weeklyConsistencyFollowupBtn){
+    weeklyConsistencyFollowupPanel.classList.remove('show');
+  }
+});
+document.getElementById('weeklyConsistencyFollowupFilter').querySelectorAll('.ms-filter-actions button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(btn.dataset.act === 'all'){ weeklyConsistencyFollowupSelected = new Set(FOLLOWUPS); }
+    else { weeklyConsistencyFollowupSelected = new Set(); }
+    weeklyConsistencyFollowupList.querySelectorAll('input[type="checkbox"]').forEach(cb=>{ cb.checked = weeklyConsistencyFollowupSelected.has(cb.value); });
+    updateWeeklyConsistencyFollowupBtnLabel();
+    renderWeeklyConsistency();
   });
 });
 
@@ -2245,7 +2313,9 @@ function renderCombinedReports(){
 function renderWeeklyConsistency(){
   const NUM_WEEKS = 6;
   const ref = effEnd();
-  const rows = FOLLOWUPS.map(f=>{
+  const allSelected = weeklyConsistencyFollowupSelected.size === FOLLOWUPS.length;
+  const followupsToShow = allSelected ? FOLLOWUPS : FOLLOWUPS.filter(f=>weeklyConsistencyFollowupSelected.has(f));
+  const rows = followupsToShow.map(f=>{
     const weeks = weeklyActivity(f, NUM_WEEKS, ref);
     const activeCount = weeks.filter(w=>w.active).length;
     const weekPoints = weeks.map(w=>gradeForDays(w.daysCount).points);
@@ -2272,8 +2342,9 @@ function renderWeeklyConsistency(){
     return `<tr><td class="nm">${escHtml(r.name)}</td>${cells}<td><strong style="color:${color};">${r.activeCount}/${NUM_WEEKS}</strong></td><td><strong style="color:${gradeColor(r.overallLetter)};">${r.overallLetter}</strong></td></tr>`;
   }).join('');
 
-  document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+3}" style="text-align:center;color:var(--ink-soft);">No follow-ups</td></tr>`;
-  document.getElementById('weeklyConsistencyTitle').textContent = `Weekly Consistency — Last ${NUM_WEEKS} Weeks (as of ${fmtDate(ref)})`;
+  document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+3}" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
+  const suffix = allSelected ? 'All Follow-ups' : (followupsToShow.length===1 ? followupsToShow[0] : `${followupsToShow.length} Follow-ups Selected`);
+  document.getElementById('weeklyConsistencyTitle').textContent = `Weekly Consistency — Last ${NUM_WEEKS} Weeks — ${suffix} (as of ${fmtDate(ref)})`;
 }
 
 function openMetDrilldown(followupName, kind){
