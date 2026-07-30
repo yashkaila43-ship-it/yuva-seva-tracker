@@ -278,7 +278,8 @@ button{font-family:inherit;}
 .custom-mode-btn.active{background:var(--marigold); color:#fff;}
 .period-custom-day, .period-custom-range{display:flex; align-items:center; gap:6px;}
 .period-custom-to{font-size:12px; color:var(--ink-soft); font-weight:600;}
-.stack-period-head{font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.3px; padding-bottom:9px; margin-bottom:3px; border-bottom:1px solid var(--line);}
+.stack-period-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px; font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.3px; padding-bottom:9px; margin-bottom:3px; border-bottom:1px solid var(--line);}
+.stack-period-sub{font-size:10.5px; font-weight:400; color:var(--ink-faint); text-transform:none; letter-spacing:0; white-space:nowrap;}
 
 .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px;}
 @media(max-width:900px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
@@ -302,10 +303,13 @@ button{font-family:inherit;}
 
 .stat-card-stack{display:flex; flex-direction:column; padding:8px 20px;}
 .stack-row{display:flex; align-items:center; justify-content:space-between; padding:12px 0;}
-.stack-row + .stack-row{border-top:1px solid var(--line);}
+.stack-row + .stack-row, .stack-subrow + .stack-row{border-top:1px solid var(--line);}
 .stack-row .label{font-size:12.5px; font-weight:700; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.4px;}
 .stack-row .hint{font-size:11.5px; color:var(--ink-faint); margin-top:2px; text-transform:none; letter-spacing:0; font-weight:400;}
 .stack-row .value{font-family:'Fraunces',serif; font-size:28px; font-weight:600; color:var(--ink); white-space:nowrap; padding-left:16px;}
+.stack-subrow{display:flex; align-items:center; justify-content:space-between; padding:0 0 12px 0;}
+.stack-subrow .label{font-size:10.5px; font-weight:600; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.3px;}
+.stack-subrow .value{font-family:'Fraunces',serif; font-size:15px; font-weight:600; color:var(--ink-soft); white-space:nowrap; padding-left:16px;}
 @media(max-width:520px){
   .stack-row{flex-direction:column; align-items:flex-start; gap:4px;}
   .stack-row .value{padding-left:0;}
@@ -1477,6 +1481,30 @@ function uniqueNSOnFieldCount(days, refStr){
   });
   return set.size;
 }
+function uniqueNSOtherSevaCount(days, refStr){
+  // Unique follow-ups (NS) who logged at least one Other Seva entry in the window.
+  // Multiple entries by the same NS in the same window still count once.
+  const set = new Set();
+  entries.forEach(e=>{
+    if(e.sevaType==='other' && withinLastNDays(e.date, days, refStr)){
+      set.add(e.followupName);
+      (e.jointFollowups||[]).forEach(j=>set.add(j));
+    }
+  });
+  return set.size;
+}
+function uniqueNSTotalSevaCount(days, refStr){
+  // Unique follow-ups (NS) who logged at least one seva entry — Yuva or Other —
+  // in the window. Multiple entries, or entries of both types, still count once.
+  const set = new Set();
+  entries.forEach(e=>{
+    if(withinLastNDays(e.date, days, refStr)){
+      set.add(e.followupName);
+      (e.jointFollowups||[]).forEach(j=>set.add(j));
+    }
+  });
+  return set.size;
+}
 function uniqueYuvaksMetCount(days, refStr){
   // Unique yuvaks met via Yuva Seva in the window (a yuvak met thrice still counts once).
   const set = new Set();
@@ -2170,6 +2198,8 @@ function renderOverview(){
 
   const uniqDays = uniqueYuvaSevaDaysAll(effDays(), effEnd());
   const uniqNS = uniqueNSOnFieldCount(effDays(), effEnd());
+  const uniqNSOther = uniqueNSOtherSevaCount(effDays(), effEnd());
+  const uniqNSTotal = uniqueNSTotalSevaCount(effDays(), effEnd());
   const uniqYuvaks = uniqueYuvaksMetCount(effDays(), effEnd());
   const neverMet = neverMetList();
 
@@ -2180,10 +2210,14 @@ function renderOverview(){
     statCardHtml('','High Alerts', high, 'Not met in over 20 days', false, 'red') +
     statCardHtml('','On Track', good, 'Met within last 10 days', false, 'green') +
     `<div class="stat-card stat-card-stack">
-      <div class="stack-period-head">${escHtml(periodHeadline())}</div>
+      <div class="stack-period-head"><span>${escHtml(periodHeadline())}</span><span class="stack-period-sub">Yuva Sewa Days: ${uniqDays}</span></div>
       <div class="stack-row">
-        <div class="label">Yuva Sewa Days</div>
-        <div class="value">${uniqDays}</div>
+        <div class="label">Total NS in Seva</div>
+        <div class="value">${uniqNSTotal}</div>
+      </div>
+      <div class="stack-subrow">
+        <div class="label">NS in Other Seva</div>
+        <div class="value">${uniqNSOther}</div>
       </div>
       <div class="stack-row">
         <div class="label">NS on Field</div>
