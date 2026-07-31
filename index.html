@@ -980,7 +980,7 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
 
       <div class="table-card" style="margin-top:20px;">
         <div class="table-head-row">
-          <h3 id="weeklyConsistencyTitle">Report Card — Last 4 Weeks</h3>
+          <h3 id="weeklyConsistencyTitle">Report Card</h3>
           <button type="button" class="snapshot-btn" id="weeklyConsistencySnapBtn" title="Copy snapshot to share">📷</button>
           <div class="period-date-wrap" style="display:flex; align-items:center; gap:6px;">
             <label for="weeklyConsistencyRefDate" style="font-size:12px; color:var(--ink-soft); white-space:nowrap;">Week ending</label>
@@ -2676,7 +2676,7 @@ function renderWeeklyConsistency(){
     const {dateLine, monthYearLine} = weekHeaderParts(w.startStr, w.endStr);
     return `<th class="week-col-head" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}"><div class="week-col-date">${dateLine}</div><div class="week-col-month">${monthYearLine}</div></th>`;
   }).join('');
-  document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th>Active</th><th>Grade</th>`;
+  document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th>Active %</th><th>Grade</th>`;
 
   const body = rows.map(r=>{
     const cells = r.weeks.map(w=>{
@@ -2685,14 +2685,17 @@ function renderWeeklyConsistency(){
       const style = w.active ? gradeBoxStyle(letter) : '';
       return `<td><span class="week-mark clickable" data-fu="${escHtml(r.name)}" data-start="${w.startStr}" data-end="${w.endStr}" style="${style}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.daysCount} day(s) of seva — grade ${letter}">${label}</span></td>`;
     }).join('');
-    const frac = r.activeCount/NUM_WEEKS;
+    const weekPcts = r.weeks.map(w=> (w.daysCount/7)*100);
+    const avgPct = weekPcts.reduce((s,p)=>s+p,0)/weekPcts.length;
+    const pct = Math.round(avgPct);
+    const frac = avgPct/100;
     const color = frac>=0.66 ? 'var(--green)' : (frac>=0.33 ? 'var(--amber)' : 'var(--red)');
-    return `<tr><td class="nm">${escHtml(r.name)}</td>${cells}<td><strong style="color:${color};">${r.activeCount}/${NUM_WEEKS}</strong></td><td><strong style="color:${gradeColor(r.overallLetter)};">${r.overallLetter}</strong></td></tr>`;
+    return `<tr><td class="nm">${escHtml(r.name)}</td>${cells}<td><strong style="color:${color};">${pct}%</strong></td><td><strong style="color:${gradeColor(r.overallLetter)};">${r.overallLetter}</strong></td></tr>`;
   }).join('');
 
   document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+3}" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
   const suffix = allSelected ? 'All Follow-ups' : (followupsToShow.length===1 ? followupsToShow[0] : `${followupsToShow.length} Follow-ups Selected`);
-  document.getElementById('weeklyConsistencyTitle').textContent = `Report Card — Last ${NUM_WEEKS} Weeks — ${suffix} (as of ${fmtDate(ref)})`;
+  document.getElementById('weeklyConsistencyTitle').textContent = `Report Card`;
 
   document.getElementById('weeklyConsistencyBody').querySelectorAll('.week-mark[data-fu]').forEach(el=>{
     el.addEventListener('click', ()=>{
