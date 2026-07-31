@@ -383,6 +383,11 @@ table.alert-table tr:last-child td{border-bottom:none;}
 table.alert-table .nm{font-weight:600;}
 table.alert-table .fu{color:var(--ink-soft); font-size:12px;}
 table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2); border-top:2px solid var(--line);}
+/* Combined Met/Not Met and Report Card headers get a slightly smaller,
+   tighter font so long words like "Assigned" and "Coverage" don't wrap
+   their last letter onto a second line. Kept uniform across every header
+   in these two tables. */
+#combinedMetTable th, #weeklyConsistencyTable th{font-size:9.5px; letter-spacing:0.15px;}
 
 .gauge{width:120px; height:8px; border-radius:5px; position:relative; background:linear-gradient(to right, var(--green) 0%, var(--green) 33.3%, var(--amber) 33.3%, var(--amber) 66.6%, var(--red) 66.6%, var(--red) 100%); opacity:0.35;}
 .gauge .marker{position:absolute; top:-3px; width:14px; height:14px; border-radius:50%; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); transform:translateX(-50%);}
@@ -402,7 +407,9 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
 .week-mark.clickable{cursor:pointer;}
 .week-mark.clickable:hover{opacity:0.75;}
 .week-mark.active{background:var(--green-bg); border-color:var(--green-line); color:var(--green);}
-th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:700; white-space:nowrap;}
+th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
+.week-col-date{font-size:inherit;}
+.week-col-month{font-size:inherit; font-weight:600; color:var(--ink-faint); margin-top:1px;}
 .wk-legend{display:inline-flex; align-items:center; gap:6px; margin:6px 0 0; flex-wrap:wrap;}
 .wk-legend .week-mark{width:16px; height:16px; font-size:9px;}
 
@@ -584,6 +591,9 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
   .combined-table-wrap table.alert-table td:not(:first-child){text-align:center;}
   .combined-table-wrap table.alert-table th{
     padding:7px 3px; font-size:9.5px; white-space:normal; line-height:1.2;
+  }
+  #combinedMetTable th, #weeklyConsistencyTable th{
+    font-size:8.5px; letter-spacing:0; padding:7px 2px;
   }
   .combined-table-wrap table.alert-table th .sort-arrow{margin-left:2px; font-size:9.5px;}
   .combined-table-wrap table.alert-table td{padding:8px 3px; font-size:11.5px;}
@@ -964,13 +974,13 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
             </div>
           </div>
         </div>
-        <div class="combined-table-wrap"><table class="alert-table"><thead><tr><th>Follow-up</th><th>Assigned Yuvaks</th><th>Met</th><th>Not Met</th><th>Coverage %</th></tr></thead><tbody id="combinedMetBody"></tbody></table></div>
+        <div class="combined-table-wrap"><table class="alert-table" id="combinedMetTable"><thead><tr><th>Follow-up</th><th>Assigned Yuvaks</th><th>Met</th><th>Not Met</th><th>Coverage %</th></tr></thead><tbody id="combinedMetBody"></tbody></table></div>
         <div class="combined-alert-hint">Tap Assigned Yuvaks to see the full roster split into Met and Not Met with names, or tap Met/Not Met directly for just that list — including the bottom Totals row, which combines every selected follow-up. Coverage % = Met ÷ Assigned, so follow-ups with different roster sizes stay comparable.</div>
       </div>
 
       <div class="table-card" style="margin-top:20px;">
         <div class="table-head-row">
-          <h3 id="weeklyConsistencyTitle">Weekly Consistency — Last 4 Weeks</h3>
+          <h3 id="weeklyConsistencyTitle">Report Card — Last 4 Weeks</h3>
           <button type="button" class="snapshot-btn" id="weeklyConsistencySnapBtn" title="Copy snapshot to share">📷</button>
           <div class="period-date-wrap" style="display:flex; align-items:center; gap:6px;">
             <label for="weeklyConsistencyRefDate" style="font-size:12px; color:var(--ink-soft); white-space:nowrap;">Week ending</label>
@@ -2647,13 +2657,25 @@ function renderWeeklyConsistency(){
     return { name:f, weeks, activeCount, overallLetter };
   }).sort((a,b)=> a.activeCount - b.activeCount || a.name.localeCompare(b.name));
 
-  // Column headers: each week's short end-date, so it's clear which week is which
-  // without needing to hover (all follow-ups share the same 6 windows).
+  // Column headers: each week's start–end date, with the month/year shown
+  // below it, so it's clear which week is which without needing to hover
+  // (all follow-ups share the same windows).
   const headWeeks = rows.length ? rows[0].weeks : weeklyActivity(FOLLOWUPS[0]||'', NUM_WEEKS, ref);
-  const shortDate = (d)=> fmtDate(d).replace(/, \d{4}$/,'');
-  const headCells = headWeeks.map(w=>
-    `<th class="week-col-head" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}">${shortDate(w.endStr)}</th>`
-  ).join('');
+  const weekHeaderParts = (startStr, endStr) => {
+    const s = parseDateStr(startStr), e = parseDateStr(endStr);
+    const startDay = s.toLocaleDateString('en-IN', {day:'numeric'});
+    const endDay = e.toLocaleDateString('en-IN', {day:'numeric'});
+    const startMonYear = s.toLocaleDateString('en-IN', {month:'short', year:'numeric'});
+    const endMonYear = e.toLocaleDateString('en-IN', {month:'short', year:'numeric'});
+    return {
+      dateLine: `${startDay} - ${endDay}`,
+      monthYearLine: startMonYear === endMonYear ? endMonYear : `${startMonYear} - ${endMonYear}`
+    };
+  };
+  const headCells = headWeeks.map(w=>{
+    const {dateLine, monthYearLine} = weekHeaderParts(w.startStr, w.endStr);
+    return `<th class="week-col-head" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}"><div class="week-col-date">${dateLine}</div><div class="week-col-month">${monthYearLine}</div></th>`;
+  }).join('');
   document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th>Active</th><th>Grade</th>`;
 
   const body = rows.map(r=>{
@@ -2670,7 +2692,7 @@ function renderWeeklyConsistency(){
 
   document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+3}" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
   const suffix = allSelected ? 'All Follow-ups' : (followupsToShow.length===1 ? followupsToShow[0] : `${followupsToShow.length} Follow-ups Selected`);
-  document.getElementById('weeklyConsistencyTitle').textContent = `Weekly Consistency — Last ${NUM_WEEKS} Weeks — ${suffix} (as of ${fmtDate(ref)})`;
+  document.getElementById('weeklyConsistencyTitle').textContent = `Report Card — Last ${NUM_WEEKS} Weeks — ${suffix} (as of ${fmtDate(ref)})`;
 
   document.getElementById('weeklyConsistencyBody').querySelectorAll('.week-mark[data-fu]').forEach(el=>{
     el.addEventListener('click', ()=>{
