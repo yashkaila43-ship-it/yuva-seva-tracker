@@ -1006,7 +1006,7 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
         </tr></thead><tbody id="weeklyConsistencyBody"></tbody></table></div>
         <div class="combined-alert-hint">Each column below the follow-up name is one Monday–Sunday calendar week, oldest on the left and the most recent on the right (dates shown in the column header). Use the "Week ending" picker above to shift this 4-week range — it only affects this report and never changes the Alert List or any other report above.
           <div style="margin-top:8px;">Each week cell shows that week's letter grade, based on how many of its 7 days (Mon–Sun) had seva logged: <strong style="color:var(--green);">A+</strong> = more than 3 days, <strong style="color:var(--green);">A</strong> = 3 days, <strong style="color:var(--amber);">B</strong> = 2 days, <strong style="color:var(--amber);">C</strong> = 1 day. A dash (<strong>–</strong>) means no seva was logged that week. The <strong>Grade</strong> column averages a follow-up's grade across all 4 weeks shown — so a follow-up that's consistently above 3 days a week stays A+, while a mix of strong and weak weeks averages out somewhere in between.</div>
-          Follow-ups are sorted with the least consistent (lowest Active count) at the top.</div>
+          Click any week, Active %, or Grade column header to sort high-to-low (click again for low-to-high, a third time to reset). By default, follow-ups are sorted with the least consistent (lowest Active count) at the top.</div>
       </div>
 
       <div class="table-card" style="margin-top:20px;">
@@ -2643,19 +2643,41 @@ function renderCombinedReports(){
   });
 }
 
+let weeklyConsistencySortState = { col:null, dir:null };
+
 function renderWeeklyConsistency(){
   const NUM_WEEKS = 4;
   const ref = weeklyConsistencyRefDate;
   const allSelected = weeklyConsistencyFollowupSelected.size === FOLLOWUPS.length;
   const followupsToShow = allSelected ? FOLLOWUPS : FOLLOWUPS.filter(f=>weeklyConsistencyFollowupSelected.has(f));
-  const rows = followupsToShow.map(f=>{
+  let rows = followupsToShow.map(f=>{
     const weeks = weeklyActivity(f, NUM_WEEKS, ref);
     const activeCount = weeks.filter(w=>w.active).length;
     const weekPoints = weeks.map(w=>gradeForDays(w.daysCount).points);
     const avgPoints = weekPoints.reduce((s,p)=>s+p,0)/NUM_WEEKS;
     const overallLetter = letterForPoints(avgPoints);
-    return { name:f, weeks, activeCount, overallLetter };
-  }).sort((a,b)=> a.activeCount - b.activeCount || a.name.localeCompare(b.name));
+    const weekPcts = weeks.map(w=> (w.daysCount/7)*100);
+    const avgPct = weekPcts.reduce((s,p)=>s+p,0)/weekPcts.length;
+    return { name:f, weeks, activeCount, overallLetter, avgPoints, avgPct };
+  });
+
+  if(weeklyConsistencySortState.col){
+    const col = weeklyConsistencySortState.col;
+    const dir = weeklyConsistencySortState.dir;
+    rows = rows.slice().sort((a,b)=>{
+      let av, bv;
+      if(col === 'active'){ av = a.avgPct; bv = b.avgPct; }
+      else if(col === 'grade'){ av = a.avgPoints; bv = b.avgPoints; }
+      else if(col.indexOf('week') === 0){
+        const idx = parseInt(col.slice(4), 10);
+        av = a.weeks[idx].daysCount; bv = b.weeks[idx].daysCount;
+      } else { av = 0; bv = 0; }
+      const diff = dir==='asc' ? av-bv : bv-av;
+      return diff !== 0 ? diff : a.name.localeCompare(b.name);
+    });
+  } else {
+    rows = rows.sort((a,b)=> a.activeCount - b.activeCount || a.name.localeCompare(b.name));
+  }
 
   // Column headers: each week's start–end date, with the month/year shown
   // below it, so it's clear which week is which without needing to hover
@@ -2672,11 +2694,11 @@ function renderWeeklyConsistency(){
       monthYearLine: startMonYear === endMonYear ? endMonYear : `${startMonYear} - ${endMonYear}`
     };
   };
-  const headCells = headWeeks.map(w=>{
+  const headCells = headWeeks.map((w,idx)=>{
     const {dateLine, monthYearLine} = weekHeaderParts(w.startStr, w.endStr);
-    return `<th class="week-col-head" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}"><div class="week-col-date">${dateLine}</div><div class="week-col-month">${monthYearLine}</div></th>`;
+    return `<th class="week-col-head sortable" data-sort="week${idx}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}"><div class="week-col-date">${dateLine}</div><div class="week-col-month">${monthYearLine}</div><span class="sort-arrow">⇅</span></th>`;
   }).join('');
-  document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th>Active %</th><th>Grade</th>`;
+  document.getElementById('weeklyConsistencyHead').innerHTML = `<th>Follow-up</th>${headCells}<th class="sortable" data-sort="active">Active %<span class="sort-arrow">⇅</span></th><th class="sortable" data-sort="grade">Grade<span class="sort-arrow">⇅</span></th>`;
 
   const body = rows.map(r=>{
     const cells = r.weeks.map(w=>{
@@ -2685,10 +2707,8 @@ function renderWeeklyConsistency(){
       const style = w.active ? gradeBoxStyle(letter) : '';
       return `<td><span class="week-mark clickable" data-fu="${escHtml(r.name)}" data-start="${w.startStr}" data-end="${w.endStr}" style="${style}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.daysCount} day(s) of seva — grade ${letter}">${label}</span></td>`;
     }).join('');
-    const weekPcts = r.weeks.map(w=> (w.daysCount/7)*100);
-    const avgPct = weekPcts.reduce((s,p)=>s+p,0)/weekPcts.length;
-    const pct = Math.round(avgPct);
-    const frac = avgPct/100;
+    const pct = Math.round(r.avgPct);
+    const frac = r.avgPct/100;
     const color = frac>=0.66 ? 'var(--green)' : (frac>=0.33 ? 'var(--amber)' : 'var(--red)');
     return `<tr><td class="nm">${escHtml(r.name)}</td>${cells}<td><strong style="color:${color};">${pct}%</strong></td><td><strong style="color:${gradeColor(r.overallLetter)};">${r.overallLetter}</strong></td></tr>`;
   }).join('');
@@ -2696,6 +2716,24 @@ function renderWeeklyConsistency(){
   document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+3}" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
   const suffix = allSelected ? 'All Follow-ups' : (followupsToShow.length===1 ? followupsToShow[0] : `${followupsToShow.length} Follow-ups Selected`);
   document.getElementById('weeklyConsistencyTitle').textContent = `Report Card`;
+
+  document.querySelectorAll('#weeklyConsistencyTable th.sortable').forEach(th=>{
+    const arrow = th.querySelector('.sort-arrow');
+    if(weeklyConsistencySortState.col === th.dataset.sort){
+      th.classList.add('sort-active');
+      arrow.textContent = weeklyConsistencySortState.dir === 'asc' ? '▲' : '▼';
+    } else {
+      th.classList.remove('sort-active');
+      arrow.textContent = '⇅';
+    }
+    th.addEventListener('click', ()=>{
+      const col = th.dataset.sort;
+      if(weeklyConsistencySortState.col !== col){ weeklyConsistencySortState = { col, dir:'desc' }; }
+      else if(weeklyConsistencySortState.dir === 'desc'){ weeklyConsistencySortState.dir = 'asc'; }
+      else { weeklyConsistencySortState = { col:null, dir:null }; }
+      renderWeeklyConsistency();
+    });
+  });
 
   document.getElementById('weeklyConsistencyBody').querySelectorAll('.week-mark[data-fu]').forEach(el=>{
     el.addEventListener('click', ()=>{
