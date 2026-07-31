@@ -1482,6 +1482,22 @@ function uniqueYuvaSevaDaysAll(days, refStr){
   });
   return set.size;
 }
+function uniqueOtherSevaDaysAll(days, refStr){
+  // Unique calendar days, across ALL follow-ups, on which Other Seva (only) happened.
+  const set = new Set();
+  entries.forEach(e=>{
+    if(e.sevaType==='other' && withinLastNDays(e.date, days, refStr)) set.add(e.date);
+  });
+  return set.size;
+}
+function uniqueSevaDaysAllCombined(days, refStr){
+  // Unique calendar days, across ALL follow-ups, on which ANY seva (Yuva or Other) happened.
+  const set = new Set();
+  entries.forEach(e=>{
+    if(withinLastNDays(e.date, days, refStr)) set.add(e.date);
+  });
+  return set.size;
+}
 function uniqueNSOnFieldCount(days, refStr){
   // Unique follow-ups (NS) who logged at least one Yuva Seva entry in the window.
   // Multiple entries by the same NS in the same window still count once.
@@ -1567,10 +1583,15 @@ function otherSevaByFollowup(days, refStr){
     .map(([name, items])=>({ name, items: items.slice().sort((a,b)=>a.date.localeCompare(b.date)) }))
     .sort((a,b)=>a.name.localeCompare(b.name));
 }
-function drilldownMetaHtml(){
+function drilldownMetaHtml(mode){
+  // mode: 'combined' (Yuva+Other), 'yuva' (Yuva only), or 'other' (Other only)
+  let label, count;
+  if(mode==='other'){ label = 'Other Seva Days'; count = uniqueOtherSevaDaysAll(effDays(), effEnd()); }
+  else if(mode==='combined'){ label = 'Seva Days'; count = uniqueSevaDaysAllCombined(effDays(), effEnd()); }
+  else { label = 'Yuva Sewa Days'; count = uniqueYuvaSevaDaysAll(effDays(), effEnd()); }
   return `<div class="modal-meta">
     <div class="modal-meta-range">${escHtml(periodHeadline())}</div>
-    <div class="modal-meta-days">Yuva Sewa Days: ${uniqueYuvaSevaDaysAll(effDays(), effEnd())}</div>
+    <div class="modal-meta-days">${label}: ${count}</div>
   </div>`;
 }
 function dailyCounts(entryList, nDays, refStr){
@@ -2289,7 +2310,7 @@ function renderOverview(){
 
   document.getElementById('rowTotalNSInSeva').addEventListener('click', ()=>{
     const names = namesInSevaWindow(null, effDays(), effEnd());
-    const body = drilldownMetaHtml() + (
+    const body = drilldownMetaHtml('combined') + (
       names.length===0
         ? '<div class="modal-empty">No NS logged seva in this period.</div>'
         : names.map((n,i)=>`<div class="modal-row"><span class="l">${i+1}. ${escHtml(n)}</span></div>`).join('')
@@ -2300,7 +2321,7 @@ function renderOverview(){
   });
   document.getElementById('rowNSOnField').addEventListener('click', ()=>{
     const names = namesInSevaWindow('yuva', effDays(), effEnd());
-    const body = drilldownMetaHtml() + (
+    const body = drilldownMetaHtml('yuva') + (
       names.length===0
         ? '<div class="modal-empty">No NS on field in this period.</div>'
         : names.map((n,i)=>`<div class="modal-row"><span class="l">${i+1}. ${escHtml(n)}</span></div>`).join('')
@@ -2311,7 +2332,7 @@ function renderOverview(){
   });
   document.getElementById('rowTotalYuvaksMetOv').addEventListener('click', ()=>{
     const names = yuvaksMetNameList(effDays(), effEnd());
-    const body = drilldownMetaHtml() + (
+    const body = drilldownMetaHtml('yuva') + (
       names.length===0
         ? '<div class="modal-empty">No yuvaks met in this period.</div>'
         : names.map((n,i)=>`<div class="modal-row"><span class="l">${i+1}. ${escHtml(n)}</span></div>`).join('')
@@ -2322,7 +2343,7 @@ function renderOverview(){
   });
   document.getElementById('rowNSInOtherSeva').addEventListener('click', ()=>{
     const people = otherSevaByFollowup(effDays(), effEnd());
-    const body = drilldownMetaHtml() + (
+    const body = drilldownMetaHtml('other') + (
       people.length===0
         ? '<div class="modal-empty">No Other Seva logged in this period.</div>'
         : people.map((p,i)=>{
