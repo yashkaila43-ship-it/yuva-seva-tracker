@@ -2813,48 +2813,79 @@ function combinedSevaEntriesList(followupName, days, refStr){
   return rows.sort((a,b)=> b.date.localeCompare(a.date) || a.type.localeCompare(b.type) || a.label.localeCompare(b.label));
 }
 
+function groupRowsByLabel(rows, opts){
+  // Collapses per-encounter rows (one row per yuvak-per-date, or one row per
+  // other-seva entry) into one row per unique label (yuvak name, or other-seva
+  // description) — so the same yuvak/description appearing on several dates
+  // shows up once with every date listed, AND several different labels that
+  // fall on the same date each still get their own single row (no repeated
+  // rows for the same date/label pair).
+  // rows: [{date, label, primaryFollowup, jointFollowups, followupName?}]
+  // opts.scopeFollowup: the follow-up this drilldown belongs to (for the
+  //   "joint with X" note) — pass null/undefined to skip notes (e.g. Other Seva).
+  // opts.keyByFollowup: true when rows span multiple follow-ups (the combined
+  //   Totals row) — keeps each follow-up's copy of a label separate.
+  const scopeFollowup = opts && opts.scopeFollowup;
+  const keyByFollowup = opts && opts.keyByFollowup;
+  const map = new Map();
+  rows.forEach(r=>{
+    const key = keyByFollowup ? (r.followupName+'|'+r.label) : r.label;
+    if(!map.has(key)) map.set(key, { label:r.label, followupName:r.followupName, dates:[], notes:new Set() });
+    const g = map.get(key);
+    if(!g.dates.includes(r.date)) g.dates.push(r.date);
+    if(scopeFollowup){
+      let note = '';
+      if(r.primaryFollowup === scopeFollowup){
+        if((r.jointFollowups||[]).length) note = `joint with ${r.jointFollowups.join(', ')}`;
+      } else if(r.primaryFollowup){
+        note = `joint with ${r.primaryFollowup}`;
+      }
+      if(note) g.notes.add(note);
+    }
+  });
+  const groups = Array.from(map.values()).map(g=>({
+    label: g.label,
+    followupName: g.followupName,
+    dates: g.dates.slice().sort((a,b)=> b.localeCompare(a)),
+    note: Array.from(g.notes).join('; ')
+  }));
+  groups.sort((a,b)=> b.dates[0].localeCompare(a.dates[0]) || a.label.localeCompare(b.label));
+  return groups;
+}
+function fmtDateList(dates){ return dates.map(fmtDate).join(', '); }
+
 function openSevaDrilldown(followupName, kind){
   if(kind === 'yuva'){
-    const rows = yuvaSevaEntriesList(followupName, effDays(), effEnd());
+    const raw = yuvaSevaEntriesList(followupName, effDays(), effEnd()).map(r=>({date:r.date, label:r.fullName, primaryFollowup:r.primaryFollowup, jointFollowups:r.jointFollowups}));
+    const groups = groupRowsByLabel(raw, { scopeFollowup: followupName });
     const title = `Yuva Seva — ${followupName} (${periodTagWithDate()})`;
-    const body = rows.length===0
+    const body = groups.length===0
       ? '<div class="modal-empty">No Yuva Seva logged in this period.</div>'
-      : rows.map(r=>{
-          let note = '';
-          if(r.primaryFollowup === followupName){
-            if(r.jointFollowups.length) note = ` <span class="fu">· joint with ${escHtml(r.jointFollowups.join(', '))}</span>`;
-          } else {
-            note = ` <span class="fu">· joint with ${escHtml(r.primaryFollowup)}</span>`;
-          }
-          return `<div class="modal-row"><span class="l">${escHtml(r.fullName)}${note}</span><span class="r">${fmtDate(r.date)}</span></div>`;
+      : groups.map(g=>{
+          const note = g.note ? ` <span class="fu">· ${escHtml(g.note)}</span>` : '';
+          return `<div class="modal-row"><span class="l">${escHtml(g.label)}${note}</span><span class="r">${fmtDateList(g.dates)}</span></div>`;
         }).join('');
     let copyText = `*${followupName}*\n\n*Yuva Seva* (${periodTagWithDate()})\n`;
-    if(rows.length===0){
-      copyText += 'No Yuva Seva logged in this period.';
-    } else {
-      copyText += rows.map((r,i)=>{
-        let note = '';
-        if(r.primaryFollowup === followupName){
-          if(r.jointFollowups.length) note = ` - joint with ${r.jointFollowups.join(', ')}`;
-        } else {
-          note = ` - joint with ${r.primaryFollowup}`;
-        }
-        return `${i+1}. ${fmtDate(r.date)} - ${r.fullName}${note}`;
-      }).join('\n');
-    }
+    copyText += groups.length===0 ? 'No Yuva Seva logged in this period.' : groups.map((g,i)=>{
+      const note = g.note ? ` - ${g.note}` : '';
+      return `${i+1}. ${g.label}${note} - ${fmtDateList(g.dates)}`;
+    }).join('\n');
     openModal(title, body, copyText);
   } else if(kind === 'other') {
-    const rows = otherSevaList(followupName, effDays(), effEnd());
+    const raw = otherSevaList(followupName, effDays(), effEnd()).map(e=>({date:e.date, label:e.otherSevaText}));
+    const groups = groupRowsByLabel(raw, {});
     const title = `Other Seva — ${followupName} (${periodTagWithDate()})`;
-    const body = rows.length===0
+    const body = groups.length===0
       ? '<div class="modal-empty">No Other Seva logged in this period.</div>'
-      : rows.map(e=>`<div class="modal-row"><span class="l">${escHtml(e.otherSevaText)}</span><span class="r">${fmtDate(e.date)}</span></div>`).join('');
+      : groups.map(g=>`<div class="modal-row"><span class="l">${escHtml(g.label)}</span><span class="r">${fmtDateList(g.dates)}</span></div>`).join('');
     let copyText = `*${followupName}*\n\n*Other Seva* (${periodTagWithDate()})\n`;
-    copyText += rows.length===0 ? 'No Other Seva logged in this period.' : rows.map((e,i)=>`${i+1}. ${fmtDate(e.date)} - ${e.otherSevaText}`).join('\n');
+    copyText += groups.length===0 ? 'No Other Seva logged in this period.' : groups.map((g,i)=>`${i+1}. ${g.label} - ${fmtDateList(g.dates)}`).join('\n');
     openModal(title, body, copyText);
   } else {
-    // kind === 'total' — merged Yuva + Other Seva feed for this follow-up
-    const rows = combinedSevaEntriesList(followupName, effDays(), effEnd());
+    // kind === 'total' — Yuva Seva and Other Seva shown as separate headed sections
+    const yuvaRaw = yuvaSevaEntriesList(followupName, effDays(), effEnd()).map(r=>({date:r.date, label:r.fullName, primaryFollowup:r.primaryFollowup, jointFollowups:r.jointFollowups}));
+    const yuvaGroups = groupRowsByLabel(yuvaRaw, { scopeFollowup: followupName });
+    const otherGroups = groupRowsByLabel(otherSevaList(followupName, effDays(), effEnd()).map(e=>({date:e.date, label:e.otherSevaText})), {});
     const yuvaDays = yuvaSevaDaysCount(followupName, effDays(), effEnd());
     const otherDays = otherSevaDaysCount(followupName, effDays(), effEnd());
     const totalDays = combinedSevaDaysCount(followupName, effDays(), effEnd());
@@ -2862,29 +2893,25 @@ function openSevaDrilldown(followupName, kind){
     const summary = `<div class="modal-row"><span class="l">Yuva Seva Days</span><span class="r">${yuvaDays}</span></div>
       <div class="modal-row"><span class="l">Other Seva Days</span><span class="r">${otherDays}</span></div>
       <div class="modal-row"><span class="l">Total Seva Days</span><span class="r"><strong>${totalDays}</strong></span></div>`;
-    const body = summary + (rows.length===0
-      ? '<div class="modal-empty">No seva logged in this period.</div>'
-      : rows.map(r=>{
-          let note = '';
-          if(r.primaryFollowup === followupName){
-            if(r.jointFollowups.length) note = ` <span class="fu">· joint with ${escHtml(r.jointFollowups.join(', '))}</span>`;
-          } else {
-            note = ` <span class="fu">· joint with ${escHtml(r.primaryFollowup)}</span>`;
-          }
-          const tag = r.type==='other' ? ' <span class="fu">(Other Seva)</span>' : '';
-          return `<div class="modal-row"><span class="l">${escHtml(r.label)}${tag}${note}</span><span class="r">${fmtDate(r.date)}</span></div>`;
+    const sectionHead = (label,count) => `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 4px;padding-top:8px;border-top:1px solid var(--line-soft);">${label} (${count})</div>`;
+    const yuvaSection = sectionHead('Yuva Seva', yuvaDays) + (yuvaGroups.length===0
+      ? '<div class="modal-empty">No Yuva Seva logged in this period.</div>'
+      : yuvaGroups.map(g=>{
+          const note = g.note ? ` <span class="fu">· ${escHtml(g.note)}</span>` : '';
+          return `<div class="modal-row"><span class="l">${escHtml(g.label)}${note}</span><span class="r">${fmtDateList(g.dates)}</span></div>`;
         }).join(''));
+    const otherSection = sectionHead('Other Seva', otherDays) + (otherGroups.length===0
+      ? '<div class="modal-empty">No Other Seva logged in this period.</div>'
+      : otherGroups.map(g=>`<div class="modal-row"><span class="l">${escHtml(g.label)}</span><span class="r">${fmtDateList(g.dates)}</span></div>`).join(''));
+    const body = summary + yuvaSection + otherSection;
     let copyText = `*${followupName}*\n\n*Total Seva Days* (${periodTagWithDate()})\nYuva Seva Days: ${yuvaDays}\nOther Seva Days: ${otherDays}\nTotal Seva Days: ${totalDays}\n\n`;
-    copyText += rows.length===0 ? 'No seva logged in this period.' : rows.map((r,i)=>{
-      let note = '';
-      if(r.primaryFollowup === followupName){
-        if(r.jointFollowups.length) note = ` - joint with ${r.jointFollowups.join(', ')}`;
-      } else {
-        note = ` - joint with ${r.primaryFollowup}`;
-      }
-      const tag = r.type==='other' ? ' (Other Seva)' : '';
-      return `${i+1}. ${fmtDate(r.date)} - ${r.label}${tag}${note}`;
+    copyText += `*Yuva Seva* (${yuvaDays})\n`;
+    copyText += yuvaGroups.length===0 ? 'No Yuva Seva logged in this period.' : yuvaGroups.map((g,i)=>{
+      const note = g.note ? ` - ${g.note}` : '';
+      return `${i+1}. ${g.label}${note} - ${fmtDateList(g.dates)}`;
     }).join('\n');
+    copyText += `\n\n*Other Seva* (${otherDays})\n`;
+    copyText += otherGroups.length===0 ? 'No Other Seva logged in this period.' : otherGroups.map((g,i)=>`${i+1}. ${g.label} - ${fmtDateList(g.dates)}`).join('\n');
     openModal(title, body, copyText);
   }
 }
@@ -2892,13 +2919,15 @@ function openSevaDrilldown(followupName, kind){
 function openCombinedSevaTotalDrilldown(kind, followupNames){
   // Aggregates the Total/Yuva/Other Seva drilldown across every follow-up currently
   // shown in the Combined Seva Report (used by the "Totals" row at the bottom).
+  // Rows are grouped by yuvak/description (per follow-up) so the same person or
+  // seva description appearing on several dates shows once with all dates listed,
+  // and several different entries that land on the same date each still get
+  // their own single row rather than repeating that date.
   let allRows = [];
   followupNames.forEach(fu=>{
     const merged = combinedSevaEntriesList(fu, effDays(), effEnd());
-    const rows = kind==='total' ? merged : merged.filter(r=>r.type===kind);
-    rows.forEach(r=> allRows.push(Object.assign({}, r, { followupName: fu })));
+    merged.forEach(r=> allRows.push(Object.assign({}, r, { followupName: fu })));
   });
-  allRows.sort((a,b)=> b.date.localeCompare(a.date) || a.followupName.localeCompare(b.followupName));
 
   const totalYuva = followupNames.reduce((s,fu)=>s+yuvaSevaDaysCount(fu, effDays(), effEnd()),0);
   const totalOther = followupNames.reduce((s,fu)=>s+otherSevaDaysCount(fu, effDays(), effEnd()),0);
@@ -2912,18 +2941,34 @@ function openCombinedSevaTotalDrilldown(kind, followupNames){
     <div class="modal-row"><span class="l">Total Other Seva Days</span><span class="r">${totalOther}</span></div>
     <div class="modal-row"><span class="l">Total Seva Days</span><span class="r"><strong>${totalAll}</strong></span></div>`;
 
-  const body = summary + (allRows.length===0
-    ? '<div class="modal-empty">No seva logged in this period.</div>'
-    : allRows.map(r=>{
-        const tag = r.type==='other' ? ' <span class="fu">(Other Seva)</span>' : '';
-        return `<div class="modal-row"><span class="l">${escHtml(r.label)}${tag} <span class="fu">· ${escHtml(r.followupName)}</span></span><span class="r">${fmtDate(r.date)}</span></div>`;
-      }).join(''));
+  const rowHtml = g => `<div class="modal-row"><span class="l">${escHtml(g.label)} <span class="fu">· ${escHtml(g.followupName)}</span></span><span class="r">${fmtDateList(g.dates)}</span></div>`;
+  const rowText = (g,i) => `${i+1}. ${g.label} - ${g.followupName} - ${fmtDateList(g.dates)}`;
 
-  let copyText = `*${title}*\n\nTotal Yuva Seva Days: ${totalYuva}\nTotal Other Seva Days: ${totalOther}\nTotal Seva Days: ${totalAll}\n\n`;
-  copyText += allRows.length===0 ? 'No seva logged in this period.' : allRows.map((r,i)=>{
-    const tag = r.type==='other' ? ' (Other Seva)' : '';
-    return `${i+1}. ${fmtDate(r.date)} - ${r.label}${tag} - ${r.followupName}`;
-  }).join('\n');
+  let body, copyText;
+  if(kind==='total'){
+    const yuvaGroups = groupRowsByLabel(allRows.filter(r=>r.type==='yuva'), { keyByFollowup:true });
+    const otherGroups = groupRowsByLabel(allRows.filter(r=>r.type==='other'), { keyByFollowup:true });
+    const sectionHead = (lbl,count) => `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 4px;padding-top:8px;border-top:1px solid var(--line-soft);">${lbl} (${count})</div>`;
+    const yuvaSection = sectionHead('Yuva Seva', totalYuva) + (yuvaGroups.length===0
+      ? '<div class="modal-empty">No Yuva Seva logged in this period.</div>'
+      : yuvaGroups.map(rowHtml).join(''));
+    const otherSection = sectionHead('Other Seva', totalOther) + (otherGroups.length===0
+      ? '<div class="modal-empty">No Other Seva logged in this period.</div>'
+      : otherGroups.map(rowHtml).join(''));
+    body = summary + yuvaSection + otherSection;
+    copyText = `*${title}*\n\nTotal Yuva Seva Days: ${totalYuva}\nTotal Other Seva Days: ${totalOther}\nTotal Seva Days: ${totalAll}\n\n`;
+    copyText += `*Yuva Seva* (${totalYuva})\n`;
+    copyText += yuvaGroups.length===0 ? 'No Yuva Seva logged in this period.' : yuvaGroups.map(rowText).join('\n');
+    copyText += `\n\n*Other Seva* (${totalOther})\n`;
+    copyText += otherGroups.length===0 ? 'No Other Seva logged in this period.' : otherGroups.map(rowText).join('\n');
+  } else {
+    const groups = groupRowsByLabel(allRows.filter(r=>r.type===kind), { keyByFollowup:true });
+    body = summary + (groups.length===0
+      ? '<div class="modal-empty">No seva logged in this period.</div>'
+      : groups.map(rowHtml).join(''));
+    copyText = `*${title}*\n\nTotal Yuva Seva Days: ${totalYuva}\nTotal Other Seva Days: ${totalOther}\nTotal Seva Days: ${totalAll}\n\n`;
+    copyText += groups.length===0 ? 'No seva logged in this period.' : groups.map(rowText).join('\n');
+  }
 
   openModal(title, body, copyText);
 }
