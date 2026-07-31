@@ -434,6 +434,14 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
 .modal-meta{padding-bottom:10px; margin-bottom:6px; border-bottom:1px solid var(--line);}
 .modal-meta-range{font-size:12.5px; font-weight:700; color:var(--ink-soft);}
 .modal-meta-days{font-size:11px; font-weight:400; color:var(--ink-faint); margin-top:2px;}
+.other-seva-person{padding:10px 0; border-bottom:1px solid var(--line-soft);}
+.other-seva-person:last-child{border-bottom:none;}
+.other-seva-person-head{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+.other-seva-person-head .name{font-weight:600; font-size:13.5px;}
+.other-seva-person-head .count{font-size:11.5px; font-weight:700; color:var(--ink-soft); white-space:nowrap;}
+.other-seva-entry{display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--ink-faint); margin-top:5px;}
+.other-seva-entry .date{white-space:nowrap;}
+.other-seva-entry .desc{text-align:right;}
 .count-link{cursor:pointer; font-weight:700; padding:3px 10px; border-radius:8px; display:inline-block; min-width:24px; text-align:center;}
 .count-link:hover{text-decoration:underline;}
 .count-link.count-high{color:var(--red); background:var(--red-bg);}
@@ -1541,17 +1549,23 @@ function yuvaksMetNameList(days, refStr){
   });
   return Array.from(set).sort((a,b)=>a.localeCompare(b));
 }
-function otherSevaEntryList(days, refStr){
-  // One row per NS (primary + joint follow-ups) credited with each Other Seva entry in the window,
-  // so the list matches everyone counted in the "NS in Other Seva" total.
-  const rows = [];
+function otherSevaByFollowup(days, refStr){
+  // Groups Other Seva entries by NS (primary + joint follow-ups), so each person appears once
+  // with the count of other-seva days and the dated descriptions underneath.
+  const map = new Map();
   entries.forEach(e=>{
     if(e.sevaType==='other' && withinLastNDays(e.date, days, refStr)){
-      rows.push({followupName:e.followupName, otherSevaText:e.otherSevaText, date:e.date});
-      (e.jointFollowups||[]).forEach(j=> rows.push({followupName:j, otherSevaText:e.otherSevaText, date:e.date}));
+      const item = {date:e.date, text:e.otherSevaText||''};
+      const names = [e.followupName, ...(e.jointFollowups||[])];
+      names.forEach(name=>{
+        if(!map.has(name)) map.set(name, []);
+        map.get(name).push(item);
+      });
     }
   });
-  return rows.sort((a,b)=> a.followupName.localeCompare(b.followupName) || a.date.localeCompare(b.date));
+  return Array.from(map.entries())
+    .map(([name, items])=>({ name, items: items.slice().sort((a,b)=>a.date.localeCompare(b.date)) }))
+    .sort((a,b)=>a.name.localeCompare(b.name));
 }
 function drilldownMetaHtml(){
   return `<div class="modal-meta">
@@ -2307,14 +2321,25 @@ function renderOverview(){
     openModal('Total Yuvaks Met', body, copyText);
   });
   document.getElementById('rowNSInOtherSeva').addEventListener('click', ()=>{
-    const rows = otherSevaEntryList(effDays(), effEnd());
+    const people = otherSevaByFollowup(effDays(), effEnd());
     const body = drilldownMetaHtml() + (
-      rows.length===0
+      people.length===0
         ? '<div class="modal-empty">No Other Seva logged in this period.</div>'
-        : rows.map((e,i)=>`<div class="modal-row"><span class="l">${i+1}. ${escHtml(e.followupName)}</span><span class="r">${escHtml(e.otherSevaText||'')}</span></div>`).join('')
+        : people.map((p,i)=>{
+            const entriesHtml = p.items.map(it=>
+              `<div class="other-seva-entry"><span class="date">${fmtDate(it.date)}</span><span class="desc">${escHtml(it.text)}</span></div>`
+            ).join('');
+            return `<div class="other-seva-person">
+              <div class="other-seva-person-head"><span class="name">${i+1}. ${escHtml(p.name)}</span><span class="count">${p.items.length} other seva day${p.items.length===1?'':'s'}</span></div>
+              ${entriesHtml}
+            </div>`;
+          }).join('')
     );
     const copyText = 'NS in Other Seva — '+periodTagShort()+'\n'+
-      (rows.length===0 ? 'No Other Seva logged in this period.' : rows.map((e,i)=>`${i+1}. ${e.followupName} - ${e.otherSevaText||''}`).join('\n'));
+      (people.length===0 ? 'No Other Seva logged in this period.' :
+        people.map((p,i)=>`${i+1}. ${p.name} — ${p.items.length} other seva day${p.items.length===1?'':'s'}\n`+
+          p.items.map(it=>`   ${fmtDate(it.date)} - ${it.text}`).join('\n')
+        ).join('\n'));
     openModal('NS in Other Seva', body, copyText);
   });
 
