@@ -994,7 +994,7 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
           <th>Grade</th>
         </tr></thead><tbody id="weeklyConsistencyBody"></tbody></table></div>
         <div class="combined-alert-hint">Each column below the follow-up name is one Monday–Sunday calendar week, oldest on the left and the most recent on the right (dates shown in the column header). Use the "Week ending" picker above to shift this 4-week range — it only affects this report and never changes the Alert List or any other report above.
-          <div style="margin-top:8px;">Each week cell shows that week's letter grade, based on how many of its 7 days (Mon–Sun) had seva logged: <strong style="color:var(--green);">A+</strong> = 5–7 days, <strong style="color:var(--green);">A</strong> = 4 days, <strong style="color:var(--amber);">B</strong> = 3 days, <strong style="color:var(--amber);">C</strong> = 2 days, <strong style="color:var(--red);">D</strong> = 1 day. A dash (<strong>–</strong>) means no seva was logged that week. The <strong>Grade</strong> column averages a follow-up's grade across all 4 weeks shown — so a follow-up that's consistently at 5+ days a week stays A+, while a mix of strong and weak weeks averages out somewhere in between.</div>
+          <div style="margin-top:8px;">Each week cell shows that week's letter grade, based on how many of its 7 days (Mon–Sun) had seva logged: <strong style="color:var(--green);">A+</strong> = more than 3 days, <strong style="color:var(--green);">A</strong> = 3 days, <strong style="color:var(--amber);">B</strong> = 2 days, <strong style="color:var(--amber);">C</strong> = 1 day. A dash (<strong>–</strong>) means no seva was logged that week. The <strong>Grade</strong> column averages a follow-up's grade across all 4 weeks shown — so a follow-up that's consistently above 3 days a week stays A+, while a mix of strong and weak weeks averages out somewhere in between.</div>
           Follow-ups are sorted with the least consistent (lowest Active count) at the top.</div>
       </div>
 
@@ -1458,21 +1458,20 @@ function weeklyActivity(followupName, numWeeks, refStr){
 }
 function gradeForDays(daysCount){
   // Grades a single week by how many distinct days (out of 7) had seva logged.
-  // 5, 6, or 7 days all cap at the top grade — 5+ is the bar for A+.
-  const d = Math.min(daysCount, 5);
+  // 4 or more days all cap at the top grade — "above 3 days" is the bar for A+.
+  const d = Math.min(daysCount, 4);
   const scale = [
     {letter:'F',  points:0},
-    {letter:'D',  points:1},
-    {letter:'C',  points:2},
-    {letter:'B',  points:3},
-    {letter:'A',  points:4},
-    {letter:'A+', points:5}
+    {letter:'C',  points:1},
+    {letter:'B',  points:2},
+    {letter:'A',  points:3},
+    {letter:'A+', points:4}
   ];
   return scale[d];
 }
 function letterForPoints(points){
-  const scale = ['F','D','C','B','A','A+'];
-  const idx = Math.max(0, Math.min(5, Math.round(points)));
+  const scale = ['F','C','B','A','A+'];
+  const idx = Math.max(0, Math.min(4, Math.round(points)));
   return scale[idx];
 }
 function gradeColor(letter){
