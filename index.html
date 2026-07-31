@@ -1542,11 +1542,16 @@ function yuvaksMetNameList(days, refStr){
   return Array.from(set).sort((a,b)=>a.localeCompare(b));
 }
 function otherSevaEntryList(days, refStr){
-  // Individual Other Seva entries in the window (follow-up + description), sorted by follow-up name.
-  return entries
-    .filter(e=> e.sevaType==='other' && withinLastNDays(e.date, days, refStr))
-    .slice()
-    .sort((a,b)=> a.followupName.localeCompare(b.followupName) || a.date.localeCompare(b.date));
+  // One row per NS (primary + joint follow-ups) credited with each Other Seva entry in the window,
+  // so the list matches everyone counted in the "NS in Other Seva" total.
+  const rows = [];
+  entries.forEach(e=>{
+    if(e.sevaType==='other' && withinLastNDays(e.date, days, refStr)){
+      rows.push({followupName:e.followupName, otherSevaText:e.otherSevaText, date:e.date});
+      (e.jointFollowups||[]).forEach(j=> rows.push({followupName:j, otherSevaText:e.otherSevaText, date:e.date}));
+    }
+  });
+  return rows.sort((a,b)=> a.followupName.localeCompare(b.followupName) || a.date.localeCompare(b.date));
 }
 function drilldownMetaHtml(){
   return `<div class="modal-meta">
