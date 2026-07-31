@@ -449,6 +449,7 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
 .count-link.count-high{color:var(--red); background:var(--red-bg);}
 .count-link.count-medium{color:var(--amber); background:var(--amber-bg);}
 .count-link.count-good{color:var(--green); background:var(--green-bg);}
+.count-link.count-all{color:var(--ink); background:var(--line-soft);}
 .count-link.count-zero{cursor:default; opacity:0.5;}
 .count-link.count-zero:hover{text-decoration:none;}
 .combined-alert-hint{font-size:11.5px; color:var(--ink-faint); padding:10px 4px 2px;}
@@ -921,7 +922,7 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
           <th class="sortable" data-sort="total">Total Seva Days<span class="sort-arrow">⇅</span></th>
           <th class="sortable" data-sort="daysSinceSeva">Last Seva<span class="sort-arrow">⇅</span></th>
         </tr></thead><tbody id="combinedSevaBody"></tbody></table></div>
-        <div class="combined-alert-hint">"Last Seva" reflects the most recent entry as of today, regardless of the period selected above.</div>
+        <div class="combined-alert-hint">Tap a Yuva Seva, Other Seva, or Total Seva Days number to see the day-by-day breakdown — including the bottom Totals row, which combines every selected follow-up. "Last Seva" reflects the most recent entry as of today, regardless of the period selected above.</div>
       </div>
 
       <div class="table-card" style="margin-top:20px;">
@@ -964,7 +965,7 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
           </div>
         </div>
         <div class="combined-table-wrap"><table class="alert-table"><thead><tr><th>Follow-up</th><th>Assigned Yuvaks</th><th>Met</th><th>Not Met</th><th>Coverage %</th></tr></thead><tbody id="combinedMetBody"></tbody></table></div>
-        <div class="combined-alert-hint">Tap a Met or Not Met number to see the yuvak names for that follow-up. Coverage % = Met ÷ Assigned, so follow-ups with different roster sizes stay comparable.</div>
+        <div class="combined-alert-hint">Tap Assigned Yuvaks to see the full roster split into Met and Not Met with names, or tap Met/Not Met directly for just that list — including the bottom Totals row, which combines every selected follow-up. Coverage % = Met ÷ Assigned, so follow-ups with different roster sizes stay comparable.</div>
       </div>
 
       <div class="table-card" style="margin-top:20px;">
@@ -1020,7 +1021,7 @@ th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:
           <th class="sortable" data-sort="good">Good<span class="sort-arrow">⇅</span></th>
           <th class="sortable" data-sort="total">Total<span class="sort-arrow">⇅</span></th>
         </tr></thead><tbody id="combinedAlertBody"></tbody></table></div>
-        <div class="combined-alert-hint">Tap a count to see the yuvaks in that follow-up, sorted by longest gap since last met first.</div>
+        <div class="combined-alert-hint">Tap a count to see the yuvaks in that category, sorted by longest gap since last met first — tap Total for the full High/Medium/Good breakdown for a follow-up, or use the bottom Totals row to see any category combined across every selected follow-up.</div>
       </div>
     </div>
 
@@ -2212,7 +2213,7 @@ function renderCombinedAlertReport(){
     <td>${countCell(d.name,'high',d.high)}</td>
     <td>${countCell(d.name,'medium',d.medium)}</td>
     <td>${countCell(d.name,'good',d.good)}</td>
-    <td><strong>${d.total}</strong></td>
+    <td>${countCell(d.name,'all',d.total)}</td>
   </tr>`).join('');
 
   if(filtered.length > 0){
@@ -2221,7 +2222,7 @@ function renderCombinedAlertReport(){
     const totalMedium = filtered.reduce((s,d)=>s+d.medium,0);
     const totalGood = filtered.reduce((s,d)=>s+d.good,0);
     const totalAll = filtered.reduce((s,d)=>s+d.total,0);
-    rows += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalHigh}</td><td>${totalMedium}</td><td>${totalGood}</td><td>${totalAll}</td></tr>`;
+    rows += `<tr class="totals-row"><td>${totalLabel}</td><td>${countCell('__ALL__','high',totalHigh)}</td><td>${countCell('__ALL__','medium',totalMedium)}</td><td>${countCell('__ALL__','good',totalGood)}</td><td>${countCell('__ALL__','all',totalAll)}</td></tr>`;
   }
 
   document.getElementById('combinedAlertBody').innerHTML = rows || `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
@@ -2241,11 +2242,45 @@ function renderCombinedAlertReport(){
   });
 
   document.querySelectorAll('#combinedAlertBody .count-link:not(.count-zero)').forEach(el=>{
-    el.addEventListener('click', ()=> openAlertDrilldown(el.dataset.fu, el.dataset.status));
+    el.addEventListener('click', ()=>{
+      if(el.dataset.fu === '__ALL__') openCombinedAlertTotalDrilldown(el.dataset.status, filtered.map(d=>d.name));
+      else openAlertDrilldown(el.dataset.fu, el.dataset.status);
+    });
   });
 }
 
 function openAlertDrilldown(followupName, status){
+  if(status === 'all'){
+    // Total column — full breakdown of High / Medium / Good for this follow-up, with counts up top
+    const list = alertBreakdownFor(followupName);
+    const sortFn = (a,b)=>{ const da=a.d===null?Infinity:a.d, db=b.d===null?Infinity:b.d; if(db!==da) return db-da; return a.fullName.localeCompare(b.fullName); };
+    const high = list.filter(x=>x.status==='high').sort(sortFn);
+    const medium = list.filter(x=>x.status==='medium').sort(sortFn);
+    const good = list.filter(x=>x.status==='good').sort(sortFn);
+    const title = `Total — ${followupName} (${list.length})`;
+    const summary = `<div class="modal-row"><span class="l">Total Yuvaks</span><span class="r">${list.length}</span></div>
+      <div class="modal-row"><span class="l">High Alert</span><span class="r" style="color:var(--red);">${high.length}</span></div>
+      <div class="modal-row"><span class="l">Medium Alert</span><span class="r" style="color:var(--amber);">${medium.length}</span></div>
+      <div class="modal-row"><span class="l">Good</span><span class="r" style="color:var(--green);">${good.length}</span></div>`;
+    const sectionHead = (label,count) => `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 4px;padding-top:8px;border-top:1px solid var(--line-soft);">${label} (${count})</div>`;
+    const rowHtml = y=>{
+      const lastMetText = y.lastMet ? fmtDate(y.lastMet) : 'Never met';
+      const gapText = y.d===null ? '' : ` · ${y.d} day${y.d===1?'':'s'} gap`;
+      return `<div class="modal-row"><span class="l">${escHtml(y.fullName)}</span><span class="r">${lastMetText}${gapText}</span></div>`;
+    };
+    const section = (label, arr) => sectionHead(label, arr.length) + (arr.length===0 ? '<div class="modal-empty">None in this category.</div>' : arr.map(rowHtml).join(''));
+    const body = summary + section('High Alert', high) + section('Medium Alert', medium) + section('Good', good);
+    const copyRow = (y,i)=>{
+      const lastMetText = y.lastMet ? fmtDate(y.lastMet) : 'Never met';
+      const gapText = y.d===null ? '' : ` - Gap of ${y.d} day${y.d===1?'':'s'}`;
+      return `${i+1}. ${y.fullName} - Last met (${lastMetText})${gapText}`;
+    };
+    const copySection = (label, arr) => `*${label} (${arr.length})*\n` + (arr.length===0 ? 'None in this category.' : arr.map(copyRow).join('\n'));
+    let copyText = `*${followupName}*\n\n*Total* (${list.length})\nHigh Alert: ${high.length}\nMedium Alert: ${medium.length}\nGood: ${good.length}\n\n`;
+    copyText += [copySection('High Alert', high), copySection('Medium Alert', medium), copySection('Good', good)].join('\n\n');
+    openModal(title, body, copyText);
+    return;
+  }
   const label = status==='high' ? 'High Alert' : (status==='medium' ? 'Medium Alert' : 'Good');
   let list = alertBreakdownFor(followupName).filter(x=>x.status===status);
   // Longest gap since last met on top, most recently met at the bottom. Never-met counts as the largest gap.
@@ -2268,6 +2303,61 @@ function openAlertDrilldown(followupName, status){
     const gapText = y.d===null ? '' : ` - Gap of ${y.d} day${y.d===1?'':'s'}`;
     return `${i+1}. ${y.fullName} - Last met (${lastMetText})${gapText}`;
   }).join('\n');
+  openModal(title, body, copyText);
+}
+
+function openCombinedAlertTotalDrilldown(status, followupNames){
+  // Aggregates High / Medium / Good across every follow-up currently shown in the
+  // Combined Alert Report (used by the "Totals" row at the bottom, and by clicking
+  // the Total column's own total cell).
+  let all = [];
+  followupNames.forEach(fu=>{
+    alertBreakdownFor(fu).forEach(y=> all.push(Object.assign({}, y, { followupName: fu })));
+  });
+  const sortFn = (a,b)=>{ const da=a.d===null?Infinity:a.d, db=b.d===null?Infinity:b.d; if(db!==da) return db-da; return a.fullName.localeCompare(b.fullName); };
+  const high = all.filter(x=>x.status==='high').sort(sortFn);
+  const medium = all.filter(x=>x.status==='medium').sort(sortFn);
+  const good = all.filter(x=>x.status==='good').sort(sortFn);
+  const scopeLabel = followupNames.length===FOLLOWUPS.length ? 'All Follow-ups' : (followupNames.length===1 ? followupNames[0] : 'Selected Follow-ups');
+
+  let title;
+  if(status==='high') title = `High Alert — ${scopeLabel} (${high.length})`;
+  else if(status==='medium') title = `Medium Alert — ${scopeLabel} (${medium.length})`;
+  else if(status==='good') title = `Good — ${scopeLabel} (${good.length})`;
+  else title = `Total — ${scopeLabel} (${all.length})`;
+
+  const summary = `<div class="modal-row"><span class="l">Total Yuvaks</span><span class="r">${all.length}</span></div>
+    <div class="modal-row"><span class="l">High Alert</span><span class="r" style="color:var(--red);">${high.length}</span></div>
+    <div class="modal-row"><span class="l">Medium Alert</span><span class="r" style="color:var(--amber);">${medium.length}</span></div>
+    <div class="modal-row"><span class="l">Good</span><span class="r" style="color:var(--green);">${good.length}</span></div>`;
+
+  const sectionHead = (label,count) => `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 4px;padding-top:8px;border-top:1px solid var(--line-soft);">${label} (${count})</div>`;
+  const rowHtml = y=>{
+    const lastMetText = y.lastMet ? fmtDate(y.lastMet) : 'Never met';
+    const gapText = y.d===null ? '' : ` · ${y.d} day${y.d===1?'':'s'} gap`;
+    return `<div class="modal-row"><span class="l">${escHtml(y.fullName)} <span class="fu">· ${escHtml(y.followupName)}</span></span><span class="r">${lastMetText}${gapText}</span></div>`;
+  };
+  const section = (label, arr) => sectionHead(label, arr.length) + (arr.length===0 ? '<div class="modal-empty">None in this category.</div>' : arr.map(rowHtml).join(''));
+
+  let body = summary;
+  if(status==='high' || status==='all') body += section('High Alert', high);
+  if(status==='medium' || status==='all') body += section('Medium Alert', medium);
+  if(status==='good' || status==='all') body += section('Good', good);
+
+  const copyRow = (y,i)=>{
+    const lastMetText = y.lastMet ? fmtDate(y.lastMet) : 'Never met';
+    const gapText = y.d===null ? '' : ` - Gap of ${y.d} day${y.d===1?'':'s'}`;
+    return `${i+1}. ${y.fullName} - Last met (${lastMetText})${gapText} - ${y.followupName}`;
+  };
+  const copySection = (label, arr) => `*${label} (${arr.length})*\n` + (arr.length===0 ? 'None in this category.' : arr.map(copyRow).join('\n'));
+
+  let copyText = `*${title}*\n\nTotal Yuvaks: ${all.length}\nHigh Alert: ${high.length}\nMedium Alert: ${medium.length}\nGood: ${good.length}\n\n`;
+  const parts = [];
+  if(status==='high' || status==='all') parts.push(copySection('High Alert', high));
+  if(status==='medium' || status==='all') parts.push(copySection('Medium Alert', medium));
+  if(status==='good' || status==='all') parts.push(copySection('Good', good));
+  copyText += parts.join('\n\n');
+
   openModal(title, body, copyText);
 }
 
@@ -2478,15 +2568,16 @@ function renderCombinedReports(){
     return `<span class="pill pill-${d.sevaStatus}">${label}</span>`;
   };
 
-  let rows1 = sevaRows.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${sevaNumCell(d.name,'yuva',d.yuvaDays)}</td><td>${sevaNumCell(d.name,'other',d.otherDays)}</td><td><strong>${d.total}</strong></td><td>${lastSevaHtml(d)}</td></tr>`).join('');
+  let rows1 = sevaRows.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${sevaNumCell(d.name,'yuva',d.yuvaDays)}</td><td>${sevaNumCell(d.name,'other',d.otherDays)}</td><td>${sevaNumCell(d.name,'total',d.total)}</td><td>${lastSevaHtml(d)}</td></tr>`).join('');
   const metNumCell = (fu, kind, val) => `<span class="num-link${val===0?' num-zero':''}" data-fu="${escAttr(fu)}" data-kind="${kind}" style="color:${kind==='met'?'var(--green)':'var(--red)'};">${val}</span>`;
+  const assignedCell = (fu, val) => `<span class="num-link${val===0?' num-zero':''}" data-fu="${escAttr(fu)}" data-kind="assigned">${val}</span>`;
   const coverageHtml = (d) => {
     if(d.coverage===null) return '—';
     const color = d.coverage>=75 ? 'var(--green)' : (d.coverage>=40 ? 'var(--amber)' : 'var(--red)');
     return `<strong style="color:${color};">${d.coverage}%</strong>`;
   };
 
-  let rows2 = filtered.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${d.assigned}</td><td>${metNumCell(d.name,'met',d.met)}</td><td>${metNumCell(d.name,'notmet',d.notMet)}</td><td>${coverageHtml(d)}</td></tr>`).join('');
+  let rows2 = filtered.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${assignedCell(d.name,d.assigned)}</td><td>${metNumCell(d.name,'met',d.met)}</td><td>${metNumCell(d.name,'notmet',d.notMet)}</td><td>${coverageHtml(d)}</td></tr>`).join('');
 
   let trendRows = filtered.slice().sort((a,b)=> b.yuvaTrend - a.yuvaTrend || a.name.localeCompare(b.name));
   let rows3 = trendRows.map(d=>`<tr><td class="nm">${escHtml(d.name)}</td><td>${d.yuvaDays}</td><td>${d.prevYuvaDays}</td><td>${trendHtml(d.yuvaTrend)}</td></tr>`).join('');
@@ -2502,8 +2593,8 @@ function renderCombinedReports(){
     const totalCoverage = totalAssigned ? Math.round((totalMet/totalAssigned)*100) : null;
     const totalPrevYuva = filtered.reduce((s,d)=>s+d.prevYuvaDays,0);
     const totalYuvaTrend = filtered.reduce((s,d)=>s+d.yuvaTrend,0);
-    rows1 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalYuva}</td><td>${totalOther}</td><td>${totalAll}</td><td>—</td></tr>`;
-    rows2 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalAssigned}</td><td style="color:var(--green);">${totalMet}</td><td style="color:var(--red);">${totalNotMet}</td><td>${totalCoverage===null?'—':coverageHtml({coverage:totalCoverage})}</td></tr>`;
+    rows1 += `<tr class="totals-row"><td>${totalLabel}</td><td>${sevaNumCell('__ALL__','yuva',totalYuva)}</td><td>${sevaNumCell('__ALL__','other',totalOther)}</td><td>${sevaNumCell('__ALL__','total',totalAll)}</td><td>—</td></tr>`;
+    rows2 += `<tr class="totals-row"><td>${totalLabel}</td><td>${assignedCell('__ALL__',totalAssigned)}</td><td>${metNumCell('__ALL__','met',totalMet)}</td><td>${metNumCell('__ALL__','notmet',totalNotMet)}</td><td>${totalCoverage===null?'—':coverageHtml({coverage:totalCoverage})}</td></tr>`;
     rows3 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalYuva}</td><td>${totalPrevYuva}</td><td>${trendHtml(totalYuvaTrend)}</td></tr>`;
   }
 
@@ -2528,11 +2619,17 @@ function renderCombinedReports(){
   });
 
   document.querySelectorAll('#combinedSevaBody .num-link:not(.num-zero)').forEach(el=>{
-    el.addEventListener('click', ()=> openSevaDrilldown(el.dataset.fu, el.dataset.kind));
+    el.addEventListener('click', ()=>{
+      if(el.dataset.fu === '__ALL__') openCombinedSevaTotalDrilldown(el.dataset.kind, sevaRows.map(d=>d.name));
+      else openSevaDrilldown(el.dataset.fu, el.dataset.kind);
+    });
   });
 
   document.querySelectorAll('#combinedMetBody .num-link:not(.num-zero)').forEach(el=>{
-    el.addEventListener('click', ()=> openMetDrilldown(el.dataset.fu, el.dataset.kind));
+    el.addEventListener('click', ()=>{
+      if(el.dataset.fu === '__ALL__') openCombinedMetTotalDrilldown(el.dataset.kind, filtered.map(d=>d.name));
+      else openMetDrilldown(el.dataset.fu, el.dataset.kind);
+    });
   });
 }
 
@@ -2601,7 +2698,7 @@ function openMetDrilldown(followupName, kind){
     let copyText = `*${followupName}*\n\n*Yuvak Met* (${periodTagWithDate()})\n`;
     copyText += rows.length===0 ? 'No yuvaks met in this period.' : rows.map((y,i)=>`${i+1}. ${y.fullName}`).join('\n');
     openModal(title, body, copyText);
-  } else {
+  } else if(kind === 'notmet') {
     const rows = yuvaksNotMetList(followupName, effDays(), effEnd());
     const title = `Not Met — ${followupName} (${periodTagWithDate()})`;
     const body = rows.length===0
@@ -2610,7 +2707,81 @@ function openMetDrilldown(followupName, kind){
     let copyText = `*${followupName}*\n\n*Yuvak Not Met* (${periodTagWithDate()})\n`;
     copyText += rows.length===0 ? 'Everyone on the roster was met in this period.' : rows.map((y,i)=>`${i+1}. ${y.fullName}`).join('\n');
     openModal(title, body, copyText);
+  } else {
+    // kind === 'assigned' — full roster split into Met + Not Met, with counts up top
+    const metRows = yuvaksMetList(followupName, effDays(), effEnd());
+    const notMetRows = yuvaksNotMetList(followupName, effDays(), effEnd());
+    const assigned = metRows.length + notMetRows.length;
+    const title = `Assigned Yuvaks — ${followupName} (${periodTagWithDate()})`;
+    const summary = `<div class="modal-row"><span class="l">Total Assigned Yuvaks</span><span class="r">${assigned}</span></div>
+      <div class="modal-row"><span class="l">Met</span><span class="r" style="color:var(--green);">${metRows.length}</span></div>
+      <div class="modal-row"><span class="l">Not Met</span><span class="r" style="color:var(--red);">${notMetRows.length}</span></div>`;
+    const sectionHead = (label,count) => `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 4px;padding-top:8px;border-top:1px solid var(--line-soft);">${label} (${count})</div>`;
+    const metSection = sectionHead('Met', metRows.length) + (metRows.length===0
+      ? '<div class="modal-empty">No yuvaks met in this period.</div>'
+      : metRows.map(y=>`<div class="modal-row"><span class="l">${escHtml(y.fullName)}</span><span class="r">${fmtDate(y.lastMet)}</span></div>`).join(''));
+    const notMetSection = sectionHead('Not Met', notMetRows.length) + (notMetRows.length===0
+      ? '<div class="modal-empty">Everyone on the roster was met in this period.</div>'
+      : notMetRows.map(y=>`<div class="modal-row"><span class="l">${escHtml(y.fullName)}</span><span class="r">${y.lastMet ? 'Last met '+fmtDate(y.lastMet) : 'Never met'}</span></div>`).join(''));
+    const body = summary + metSection + notMetSection;
+    let copyText = `*${followupName}*\n\n*Assigned Yuvaks* (${periodTagWithDate()})\nTotal Assigned Yuvaks: ${assigned}\nMet: ${metRows.length}\nNot Met: ${notMetRows.length}\n\n`;
+    copyText += `*Met (${metRows.length})*\n`;
+    copyText += metRows.length===0 ? 'No yuvaks met in this period.' : metRows.map((y,i)=>`${i+1}. ${y.fullName}`).join('\n');
+    copyText += `\n\n*Not Met (${notMetRows.length})*\n`;
+    copyText += notMetRows.length===0 ? 'Everyone on the roster was met in this period.' : notMetRows.map((y,i)=>`${i+1}. ${y.fullName}`).join('\n');
+    openModal(title, body, copyText);
   }
+}
+
+function openCombinedMetTotalDrilldown(kind, followupNames){
+  // Aggregates Assigned/Met/Not-Met across every follow-up currently shown in the
+  // Combined Met / Not Met Report (used by the "Totals" row at the bottom).
+  let metAll = [], notMetAll = [];
+  followupNames.forEach(fu=>{
+    yuvaksMetList(fu, effDays(), effEnd()).forEach(y=> metAll.push(Object.assign({}, y, { followupName: fu })));
+    yuvaksNotMetList(fu, effDays(), effEnd()).forEach(y=> notMetAll.push(Object.assign({}, y, { followupName: fu })));
+  });
+  metAll.sort((a,b)=> a.followupName.localeCompare(b.followupName) || a.fullName.localeCompare(b.fullName));
+  notMetAll.sort((a,b)=> a.followupName.localeCompare(b.followupName) || a.fullName.localeCompare(b.fullName));
+  const totalAssigned = metAll.length + notMetAll.length;
+  const scopeLabel = followupNames.length===FOLLOWUPS.length ? 'All Follow-ups' : (followupNames.length===1 ? followupNames[0] : 'Selected Follow-ups');
+
+  let title;
+  if(kind==='met') title = `Met — ${scopeLabel} (${periodTagWithDate()})`;
+  else if(kind==='notmet') title = `Not Met — ${scopeLabel} (${periodTagWithDate()})`;
+  else title = `Assigned Yuvaks — ${scopeLabel} (${periodTagWithDate()})`;
+
+  const summary = `<div class="modal-row"><span class="l">Total Assigned Yuvaks</span><span class="r">${totalAssigned}</span></div>
+    <div class="modal-row"><span class="l">Met</span><span class="r" style="color:var(--green);">${metAll.length}</span></div>
+    <div class="modal-row"><span class="l">Not Met</span><span class="r" style="color:var(--red);">${notMetAll.length}</span></div>`;
+
+  const sectionHead = (label,count) => `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 4px;padding-top:8px;border-top:1px solid var(--line-soft);">${label} (${count})</div>`;
+  const metSection = sectionHead('Met', metAll.length) + (metAll.length===0
+    ? '<div class="modal-empty">No yuvaks met in this period.</div>'
+    : metAll.map(y=>`<div class="modal-row"><span class="l">${escHtml(y.fullName)} <span class="fu">· ${escHtml(y.followupName)}</span></span><span class="r">${fmtDate(y.lastMet)}</span></div>`).join(''));
+  const notMetSection = sectionHead('Not Met', notMetAll.length) + (notMetAll.length===0
+    ? '<div class="modal-empty">Everyone on the roster was met in this period.</div>'
+    : notMetAll.map(y=>`<div class="modal-row"><span class="l">${escHtml(y.fullName)} <span class="fu">· ${escHtml(y.followupName)}</span></span><span class="r">${y.lastMet ? 'Last met '+fmtDate(y.lastMet) : 'Never met'}</span></div>`).join(''));
+
+  let body = summary;
+  if(kind!=='notmet') body += metSection;
+  if(kind!=='met') body += notMetSection;
+
+  let copyText = `*${title}*\n\nTotal Assigned Yuvaks: ${totalAssigned}\nMet: ${metAll.length}\nNot Met: ${notMetAll.length}\n\n`;
+  const parts = [];
+  if(kind!=='notmet'){
+    let t = `*Met (${metAll.length})*\n`;
+    t += metAll.length===0 ? 'No yuvaks met in this period.' : metAll.map((y,i)=>`${i+1}. ${y.fullName} - ${y.followupName}`).join('\n');
+    parts.push(t);
+  }
+  if(kind!=='met'){
+    let t = `*Not Met (${notMetAll.length})*\n`;
+    t += notMetAll.length===0 ? 'Everyone on the roster was met in this period.' : notMetAll.map((y,i)=>`${i+1}. ${y.fullName} - ${y.followupName}`).join('\n');
+    parts.push(t);
+  }
+  copyText += parts.join('\n\n');
+
+  openModal(title, body, copyText);
 }
 
 function yuvaSevaEntriesList(followupName, days, refStr){
@@ -2623,6 +2794,23 @@ function yuvaSevaEntriesList(followupName, days, refStr){
     }
   });
   return rows.sort((a,b)=> b.date.localeCompare(a.date) || a.fullName.localeCompare(b.fullName));
+}
+
+function combinedSevaEntriesList(followupName, days, refStr){
+  // Merges Yuva Seva (one row per yuvak) and Other Seva (one row per entry) so
+  // the "Total Seva Days" drilldown can list everything in one chronological feed.
+  const rows = [];
+  relevantEntries(followupName).forEach(e=>{
+    if(!withinLastNDays(e.date, days, refStr)) return;
+    if(e.sevaType==='yuva'){
+      (e.yuvaks||[]).forEach(y=>{
+        rows.push({ date:e.date, type:'yuva', label:y.fullName, primaryFollowup:e.followupName, jointFollowups:e.jointFollowups||[] });
+      });
+    } else if(e.sevaType==='other'){
+      rows.push({ date:e.date, type:'other', label:e.otherSevaText, primaryFollowup:e.followupName, jointFollowups:e.jointFollowups||[] });
+    }
+  });
+  return rows.sort((a,b)=> b.date.localeCompare(a.date) || a.type.localeCompare(b.type) || a.label.localeCompare(b.label));
 }
 
 function openSevaDrilldown(followupName, kind){
@@ -2655,7 +2843,7 @@ function openSevaDrilldown(followupName, kind){
       }).join('\n');
     }
     openModal(title, body, copyText);
-  } else {
+  } else if(kind === 'other') {
     const rows = otherSevaList(followupName, effDays(), effEnd());
     const title = `Other Seva — ${followupName} (${periodTagWithDate()})`;
     const body = rows.length===0
@@ -2664,7 +2852,80 @@ function openSevaDrilldown(followupName, kind){
     let copyText = `*${followupName}*\n\n*Other Seva* (${periodTagWithDate()})\n`;
     copyText += rows.length===0 ? 'No Other Seva logged in this period.' : rows.map((e,i)=>`${i+1}. ${fmtDate(e.date)} - ${e.otherSevaText}`).join('\n');
     openModal(title, body, copyText);
+  } else {
+    // kind === 'total' — merged Yuva + Other Seva feed for this follow-up
+    const rows = combinedSevaEntriesList(followupName, effDays(), effEnd());
+    const yuvaDays = yuvaSevaDaysCount(followupName, effDays(), effEnd());
+    const otherDays = otherSevaDaysCount(followupName, effDays(), effEnd());
+    const totalDays = combinedSevaDaysCount(followupName, effDays(), effEnd());
+    const title = `Total Seva Days — ${followupName} (${periodTagWithDate()})`;
+    const summary = `<div class="modal-row"><span class="l">Yuva Seva Days</span><span class="r">${yuvaDays}</span></div>
+      <div class="modal-row"><span class="l">Other Seva Days</span><span class="r">${otherDays}</span></div>
+      <div class="modal-row"><span class="l">Total Seva Days</span><span class="r"><strong>${totalDays}</strong></span></div>`;
+    const body = summary + (rows.length===0
+      ? '<div class="modal-empty">No seva logged in this period.</div>'
+      : rows.map(r=>{
+          let note = '';
+          if(r.primaryFollowup === followupName){
+            if(r.jointFollowups.length) note = ` <span class="fu">· joint with ${escHtml(r.jointFollowups.join(', '))}</span>`;
+          } else {
+            note = ` <span class="fu">· joint with ${escHtml(r.primaryFollowup)}</span>`;
+          }
+          const tag = r.type==='other' ? ' <span class="fu">(Other Seva)</span>' : '';
+          return `<div class="modal-row"><span class="l">${escHtml(r.label)}${tag}${note}</span><span class="r">${fmtDate(r.date)}</span></div>`;
+        }).join(''));
+    let copyText = `*${followupName}*\n\n*Total Seva Days* (${periodTagWithDate()})\nYuva Seva Days: ${yuvaDays}\nOther Seva Days: ${otherDays}\nTotal Seva Days: ${totalDays}\n\n`;
+    copyText += rows.length===0 ? 'No seva logged in this period.' : rows.map((r,i)=>{
+      let note = '';
+      if(r.primaryFollowup === followupName){
+        if(r.jointFollowups.length) note = ` - joint with ${r.jointFollowups.join(', ')}`;
+      } else {
+        note = ` - joint with ${r.primaryFollowup}`;
+      }
+      const tag = r.type==='other' ? ' (Other Seva)' : '';
+      return `${i+1}. ${fmtDate(r.date)} - ${r.label}${tag}${note}`;
+    }).join('\n');
+    openModal(title, body, copyText);
   }
+}
+
+function openCombinedSevaTotalDrilldown(kind, followupNames){
+  // Aggregates the Total/Yuva/Other Seva drilldown across every follow-up currently
+  // shown in the Combined Seva Report (used by the "Totals" row at the bottom).
+  let allRows = [];
+  followupNames.forEach(fu=>{
+    const merged = combinedSevaEntriesList(fu, effDays(), effEnd());
+    const rows = kind==='total' ? merged : merged.filter(r=>r.type===kind);
+    rows.forEach(r=> allRows.push(Object.assign({}, r, { followupName: fu })));
+  });
+  allRows.sort((a,b)=> b.date.localeCompare(a.date) || a.followupName.localeCompare(b.followupName));
+
+  const totalYuva = followupNames.reduce((s,fu)=>s+yuvaSevaDaysCount(fu, effDays(), effEnd()),0);
+  const totalOther = followupNames.reduce((s,fu)=>s+otherSevaDaysCount(fu, effDays(), effEnd()),0);
+  const totalAll = followupNames.reduce((s,fu)=>s+combinedSevaDaysCount(fu, effDays(), effEnd()),0);
+
+  const label = kind==='yuva' ? 'Yuva Seva Days' : (kind==='other' ? 'Other Seva Days' : 'Total Seva Days');
+  const scopeLabel = followupNames.length===FOLLOWUPS.length ? 'All Follow-ups' : (followupNames.length===1 ? followupNames[0] : 'Selected Follow-ups');
+  const title = `${label} — ${scopeLabel} (${periodTagWithDate()})`;
+
+  const summary = `<div class="modal-row"><span class="l">Total Yuva Seva Days</span><span class="r">${totalYuva}</span></div>
+    <div class="modal-row"><span class="l">Total Other Seva Days</span><span class="r">${totalOther}</span></div>
+    <div class="modal-row"><span class="l">Total Seva Days</span><span class="r"><strong>${totalAll}</strong></span></div>`;
+
+  const body = summary + (allRows.length===0
+    ? '<div class="modal-empty">No seva logged in this period.</div>'
+    : allRows.map(r=>{
+        const tag = r.type==='other' ? ' <span class="fu">(Other Seva)</span>' : '';
+        return `<div class="modal-row"><span class="l">${escHtml(r.label)}${tag} <span class="fu">· ${escHtml(r.followupName)}</span></span><span class="r">${fmtDate(r.date)}</span></div>`;
+      }).join(''));
+
+  let copyText = `*${title}*\n\nTotal Yuva Seva Days: ${totalYuva}\nTotal Other Seva Days: ${totalOther}\nTotal Seva Days: ${totalAll}\n\n`;
+  copyText += allRows.length===0 ? 'No seva logged in this period.' : allRows.map((r,i)=>{
+    const tag = r.type==='other' ? ' (Other Seva)' : '';
+    return `${i+1}. ${fmtDate(r.date)} - ${r.label}${tag} - ${r.followupName}`;
+  }).join('\n');
+
+  openModal(title, body, copyText);
 }
 
 function renderIndividual(){
