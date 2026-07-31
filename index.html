@@ -399,6 +399,8 @@ table.alert-table tr.totals-row td{font-weight:700; background:var(--surface-2);
 .week-dot.active{background:var(--green); border-color:var(--green);}
 
 .week-mark{display:inline-flex; align-items:center; justify-content:center; min-width:24px; height:20px; padding:0 4px; border-radius:5px; background:var(--surface-2); border:1px solid var(--line); color:var(--ink-faint); font-size:11px; font-weight:800; flex-shrink:0;}
+.week-mark.clickable{cursor:pointer;}
+.week-mark.clickable:hover{opacity:0.75;}
 .week-mark.active{background:var(--green-bg); border-color:var(--green-line); color:var(--green);}
 th.week-col-head{font-size:9.5px !important; color:var(--ink-soft); font-weight:700; white-space:nowrap;}
 .wk-legend{display:inline-flex; align-items:center; gap:6px; margin:6px 0 0; flex-wrap:wrap;}
@@ -1349,6 +1351,15 @@ function otherSevaList(followupName, days, refStr){
 }
 function otherSevaDaysCount(followupName, days, refStr){
   return new Set(otherSevaList(followupName,days,refStr).map(e=>e.date)).size;
+}
+function weeklyBreakdown(followupName, startStr, endStr){
+  // Unique Yuva Seva days, unique Other Seva days, and unique total days (deduped
+  // across both types) that this follow-up logged within a given Mon–Sun week.
+  const rel = relevantEntries(followupName).filter(e=> e.date>=startStr && e.date<=endStr);
+  const yuvaDays = new Set(rel.filter(e=>e.sevaType==='yuva').map(e=>e.date)).size;
+  const otherDays = new Set(rel.filter(e=>e.sevaType==='other').map(e=>e.date)).size;
+  const totalDays = new Set(rel.map(e=>e.date)).size;
+  return { yuvaDays, otherDays, totalDays };
 }
 function combinedSevaDaysCount(followupName, days, refStr){
   // Union of dates that have a Yuva Seva and/or Other Seva entry.
@@ -2547,7 +2558,7 @@ function renderWeeklyConsistency(){
       const letter = gradeForDays(w.daysCount).letter;
       const label = w.active ? letter : '-';
       const style = w.active ? gradeBoxStyle(letter) : '';
-      return `<td><span class="week-mark" style="${style}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.daysCount} day(s) of seva — grade ${letter}">${label}</span></td>`;
+      return `<td><span class="week-mark clickable" data-fu="${escHtml(r.name)}" data-start="${w.startStr}" data-end="${w.endStr}" style="${style}" title="${fmtDate(w.startStr)} – ${fmtDate(w.endStr)}: ${w.daysCount} day(s) of seva — grade ${letter}">${label}</span></td>`;
     }).join('');
     const frac = r.activeCount/NUM_WEEKS;
     const color = frac>=0.66 ? 'var(--green)' : (frac>=0.33 ? 'var(--amber)' : 'var(--red)');
@@ -2557,6 +2568,21 @@ function renderWeeklyConsistency(){
   document.getElementById('weeklyConsistencyBody').innerHTML = body || `<tr><td colspan="${NUM_WEEKS+3}" style="text-align:center;color:var(--ink-soft);">No follow-up selected</td></tr>`;
   const suffix = allSelected ? 'All Follow-ups' : (followupsToShow.length===1 ? followupsToShow[0] : `${followupsToShow.length} Follow-ups Selected`);
   document.getElementById('weeklyConsistencyTitle').textContent = `Weekly Consistency — Last ${NUM_WEEKS} Weeks — ${suffix} (as of ${fmtDate(ref)})`;
+
+  document.getElementById('weeklyConsistencyBody').querySelectorAll('.week-mark[data-fu]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const fu = el.dataset.fu, start = el.dataset.start, end = el.dataset.end;
+      const b = weeklyBreakdown(fu, start, end);
+      const body = `<div class="modal-meta">
+          <div class="modal-meta-range">${fmtDate(start)} – ${fmtDate(end)}</div>
+        </div>
+        <div class="modal-row"><span class="l">Yuva Seva Days</span><span class="r">${b.yuvaDays}</span></div>
+        <div class="modal-row"><span class="l">Other Seva Days</span><span class="r">${b.otherDays}</span></div>
+        <div class="modal-row"><span class="l">Total Seva Days</span><span class="r">${b.totalDays}</span></div>`;
+      const copyText = `${fu} — ${fmtDate(start)} – ${fmtDate(end)}\nYuva Seva Days: ${b.yuvaDays}\nOther Seva Days: ${b.otherDays}\nTotal Seva Days: ${b.totalDays}`;
+      openModal(fu, body, copyText);
+    });
+  });
 }
 
 function openMetDrilldown(followupName, kind){
