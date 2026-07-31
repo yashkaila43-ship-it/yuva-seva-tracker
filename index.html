@@ -932,7 +932,7 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
           <th class="sortable" data-sort="total">Total Seva Days<span class="sort-arrow">⇅</span></th>
           <th class="sortable" data-sort="daysSinceSeva">Last Seva<span class="sort-arrow">⇅</span></th>
         </tr></thead><tbody id="combinedSevaBody"></tbody></table></div>
-        <div class="combined-alert-hint">Tap a Yuva Seva, Other Seva, or Total Seva Days number to see the day-by-day breakdown — including the bottom Totals row, which combines every selected follow-up. "Last Seva" reflects the most recent entry as of today, regardless of the period selected above.</div>
+        <div class="combined-alert-hint">Tap a Yuva Seva, Other Seva, or Total Seva Days number to see the day-by-day breakdown. "Last Seva" reflects the most recent entry as of today, regardless of the period selected above.</div>
       </div>
 
       <div class="table-card" style="margin-top:20px;">
@@ -2595,15 +2595,12 @@ function renderCombinedReports(){
   if(filtered.length > 0){
     const totalLabel = allSelected ? 'All Follow-ups' : 'Selected Total';
     const totalYuva = filtered.reduce((s,d)=>s+d.yuvaDays,0);
-    const totalOther = filtered.reduce((s,d)=>s+d.otherDays,0);
-    const totalAll = filtered.reduce((s,d)=>s+d.total,0);
     const totalAssigned = filtered.reduce((s,d)=>s+d.assigned,0);
     const totalMet = filtered.reduce((s,d)=>s+d.met,0);
     const totalNotMet = filtered.reduce((s,d)=>s+d.notMet,0);
     const totalCoverage = totalAssigned ? Math.round((totalMet/totalAssigned)*100) : null;
     const totalPrevYuva = filtered.reduce((s,d)=>s+d.prevYuvaDays,0);
     const totalYuvaTrend = filtered.reduce((s,d)=>s+d.yuvaTrend,0);
-    rows1 += `<tr class="totals-row"><td>${totalLabel}</td><td>${sevaNumCell('__ALL__','yuva',totalYuva)}</td><td>${sevaNumCell('__ALL__','other',totalOther)}</td><td>${sevaNumCell('__ALL__','total',totalAll)}</td><td>—</td></tr>`;
     rows2 += `<tr class="totals-row"><td>${totalLabel}</td><td>${assignedCell('__ALL__',totalAssigned)}</td><td>${metNumCell('__ALL__','met',totalMet)}</td><td>${metNumCell('__ALL__','notmet',totalNotMet)}</td><td>${totalCoverage===null?'—':coverageHtml({coverage:totalCoverage})}</td></tr>`;
     rows3 += `<tr class="totals-row"><td>${totalLabel}</td><td>${totalYuva}</td><td>${totalPrevYuva}</td><td>${trendHtml(totalYuvaTrend)}</td></tr>`;
   }
