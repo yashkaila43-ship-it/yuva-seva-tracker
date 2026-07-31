@@ -1604,6 +1604,13 @@ function drilldownMetaHtml(mode){
     <div class="modal-meta-days">${label}: ${count}</div>
   </div>`;
 }
+function drilldownCopyMeta(header, mode){
+  let label, count;
+  if(mode==='other'){ label = 'Other Seva Days'; count = uniqueOtherSevaDaysAll(effDays(), effEnd()); }
+  else if(mode==='combined'){ label = 'Seva Days'; count = uniqueSevaDaysAllCombined(effDays(), effEnd()); }
+  else { label = 'Yuva Sewa Days'; count = uniqueYuvaSevaDaysAll(effDays(), effEnd()); }
+  return `*${header}*\n${periodHeadline()}\n${label}: ${count}\n\n`;
+}
 function dailyCounts(entryList, nDays, refStr){
   const days = dateListEndingAt(refStr || todayStr(), nDays || 30);
   const yuva = {}, other = {};
@@ -2325,7 +2332,7 @@ function renderOverview(){
         ? '<div class="modal-empty">No NS logged seva in this period.</div>'
         : names.map((n,i)=>`<div class="modal-row"><span class="l">${i+1}. ${escHtml(n)}</span></div>`).join('')
     );
-    const copyText = 'Total NS in Seva — '+periodTagShort()+'\n'+
+    const copyText = drilldownCopyMeta('Total NS in Seva', 'combined') +
       (names.length===0 ? 'No NS logged seva in this period.' : names.map((n,i)=>`${i+1}. ${n}`).join('\n'));
     openModal('Total NS in Seva', body, copyText);
   });
@@ -2336,7 +2343,7 @@ function renderOverview(){
         ? '<div class="modal-empty">No NS on field in this period.</div>'
         : names.map((n,i)=>`<div class="modal-row"><span class="l">${i+1}. ${escHtml(n)}</span></div>`).join('')
     );
-    const copyText = 'NS on Field — '+periodTagShort()+'\n'+
+    const copyText = drilldownCopyMeta('NS on Field', 'yuva') +
       (names.length===0 ? 'No NS on field in this period.' : names.map((n,i)=>`${i+1}. ${n}`).join('\n'));
     openModal('NS on Field', body, copyText);
   });
@@ -2347,7 +2354,7 @@ function renderOverview(){
         ? '<div class="modal-empty">No yuvaks met in this period.</div>'
         : names.map((n,i)=>`<div class="modal-row"><span class="l">${i+1}. ${escHtml(n)}</span></div>`).join('')
     );
-    const copyText = 'Total Yuvaks Met — '+periodTagShort()+'\n'+
+    const copyText = drilldownCopyMeta('Total Yuvaks Met', 'yuva') +
       (names.length===0 ? 'No yuvaks met in this period.' : names.map((n,i)=>`${i+1}. ${n}`).join('\n'));
     openModal('Total Yuvaks Met', body, copyText);
   });
@@ -2366,11 +2373,11 @@ function renderOverview(){
             </div>`;
           }).join('')
     );
-    const copyText = 'NS in Other Seva — '+periodTagShort()+'\n'+
+    const copyText = drilldownCopyMeta('NS in Other Seva', 'other') +
       (people.length===0 ? 'No Other Seva logged in this period.' :
         people.map((p,i)=>`${i+1}. ${p.name} — ${p.items.length} other seva day${p.items.length===1?'':'s'}\n`+
           p.items.map(it=>`   ${fmtDate(it.date)} - ${it.text}`).join('\n')
-        ).join('\n'));
+        ).join('\n\n'));
     openModal('NS in Other Seva', body, copyText);
   });
 
@@ -2629,7 +2636,7 @@ function openSevaDrilldown(followupName, kind){
           if(r.primaryFollowup === followupName){
             if(r.jointFollowups.length) note = ` <span class="fu">· joint with ${escHtml(r.jointFollowups.join(', '))}</span>`;
           } else {
-            note = ` <span class="fu">· logged by ${escHtml(r.primaryFollowup)}</span>`;
+            note = ` <span class="fu">· joint with ${escHtml(r.primaryFollowup)}</span>`;
           }
           return `<div class="modal-row"><span class="l">${escHtml(r.fullName)}${note}</span><span class="r">${fmtDate(r.date)}</span></div>`;
         }).join('');
@@ -2642,7 +2649,7 @@ function openSevaDrilldown(followupName, kind){
         if(r.primaryFollowup === followupName){
           if(r.jointFollowups.length) note = ` - joint with ${r.jointFollowups.join(', ')}`;
         } else {
-          note = ` - logged by ${r.primaryFollowup}`;
+          note = ` - joint with ${r.primaryFollowup}`;
         }
         return `${i+1}. ${fmtDate(r.date)} - ${r.fullName}${note}`;
       }).join('\n');
