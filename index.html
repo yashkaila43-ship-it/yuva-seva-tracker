@@ -1079,7 +1079,12 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
 /* ======================================================================
    MASTER DATA
    ====================================================================== */
-const MASTER_YUVAKS = [{"fullName": "Abhay Ramesh Kotadiya", "followupName": "Yash Kaila"}, {"fullName": "Aditya Piyush Shrotriya", "followupName": "Vinit Hindocha"}, {"fullName": "Ajay Pravin Savaliya", "followupName": "Dhaval Chhaya"}, {"fullName": "Akash Rajesh Kajale", "followupName": "Akash Humarmalekar"}, {"fullName": "Akash Shekhar Humarmalekar", "followupName": "Vinit Hindocha"}, {"fullName": "Akshar Virendra Thoria", "followupName": "Yash Kaila"}, {"fullName": "Akshay Kiran Varma", "followupName": "Dhaval Chhaya"}, {"fullName": "Anand Bhagwan Mukhiya", "followupName": "Aditya Shrotriya"}, {"fullName": "Ankit Shyam Chaturvedi", "followupName": "Yash Kaila"}, {"fullName": "Avinash Vinayak Kadam", "followupName": "Akash Humarmalekar"}, {"fullName": "Babu Gogan Shingala", "followupName": "Suvas Waghela"}, {"fullName": "Bhargav Babu Shingala", "followupName": "Yash Kaila"}, {"fullName": "Bhavesh Savjibhai Maru", "followupName": "Suvas Waghela"}, {"fullName": "Bhavesh Dhanji Makwana", "followupName": "Suvas Waghela"}, {"fullName": "Bhavesh Mansukhlal Rathod", "followupName": "Vinit Hindocha"}, {"fullName": "Bhavyam Jaysukh Bhalala", "followupName": "Vinit Hindocha"}, {"fullName": "Bhupat chhana Pagdar", "followupName": "Pawan Rathod"}, {"fullName": "Brijesh Rajesh Mavani", "followupName": "Aditya Shrotriya"}, {"fullName": "Daksh Pragnesh Parmar", "followupName": "Yash Kaila"}, {"fullName": "Darshan Mahesh Valand", "followupName": "Bhavyam Bhalala"}, {"fullName": "Darshan Pankaj Patel", "followupName": "Akash Humarmalekar"}, {"fullName": "Darshil Rajendra Shukla", "followupName": "Yash Kaila"}, {"fullName": "Dhaval Dhiru Chhaya", "followupName": "Vinit Hindocha"}, {"fullName": "Dhiraj Chandrabhan Gupta", "followupName": "Akash Humarmalekar"}, {"fullName": "Dhiraj Damodar Suthar", "followupName": "Dhaval Chhaya"}, {"fullName": "Dhiraj Suresh Chekhaliya", "followupName": "Suresh Suthar"}, {"fullName": "Divyesh Haresh Meva", "followupName": "Vinit Hindocha"}, {"fullName": "Gaurav satish hingol", "followupName": "Yash Kaila"}, {"fullName": "Harin Acharya", "followupName": "Dhaval Chhaya"}, {"fullName": "Harsh Ashok Mewada", "followupName": "Akash Humarmalekar"}, {"fullName": "Harsh Bharat Somaiya", "followupName": "Akash Humarmalekar"}, {"fullName": "Harsh Nitin Parmar", "followupName": "Yash Kaila"}, {"fullName": "Harsh Ramesh Barvaliya", "followupName": "Akash Humarmalekar"}, {"fullName": "Harshit Gautam santoki", "followupName": "Akash Humarmalekar"}, {"fullName": "Heramb Sharad Kadam", "followupName": "Akash Humarmalekar"}, {"fullName": "Het Kalpesh Raja", "followupName": "Akash Humarmalekar"}, {"fullName": "Hitesh Dhanji Bhalala", "followupName": "Pawan Rathod"}, {"fullName": "Jash Kiran Oza", "followupName": "Aditya Shrotriya"}, {"fullName": "Jasmin Ramesh Kotadiya", "followupName": "Divyesh Meva"}, {"fullName": "Jay Sailesh Kawa", "followupName": "Yash Kaila"}, {"fullName": "Jay Shailesh Virani", "followupName": "Akash Humarmalekar"}, {"fullName": "Jayanti Parshottam Vaishnav", "followupName": "Pawan Rathod"}, {"fullName": "Jimesh Bhanu Chhunchha", "followupName": "Divyesh Meva"}, {"fullName": "Karan Tushar Shah", "followupName": "Aditya Shrotriya"}, {"fullName": "Kaushik Jaswant Darji", "followupName": "Suvas Waghela"}, {"fullName": "Kishan Vinod Suralia", "followupName": "Dhaval Chhaya"}, {"fullName": "Krishna Kamlesh Darji", "followupName": "Akash Humarmalekar"}, {"fullName": "Kush Pinakin Chauhan", "followupName": "Bhavyam Bhalala"}, {"fullName": "Lokesh Shrikant Rathod", "followupName": "Suresh Suthar"}, {"fullName": "Mahesh Amrut Valand", "followupName": "Pawan Rathod"}, {"fullName": "Mahesh Jagan Kolhekar", "followupName": "Aditya Shrotriya"}, {"fullName": "Mahesh Rameh Rakholiya", "followupName": "Dhaval Chhaya"}, {"fullName": "Mahesh Vaman Makwana", "followupName": "Suvas Waghela"}, {"fullName": "Manan Kiran Varma", "followupName": "Yash Kaila"}, {"fullName": "Manan Ramji Rangani", "followupName": "Aditya Shrotriya"}, {"fullName": "Manan Sumit More", "followupName": "Akash Humarmalekar"}, {"fullName": "Manish Hasmukh Rathod", "followupName": "Suvas Waghela"}, {"fullName": "Mansukh Vallabh Ragani", "followupName": "Pawan Rathod"}, {"fullName": "Mayank Narsi Virani", "followupName": "Yash Kaila"}, {"fullName": "Meet Nilesh Bataviya", "followupName": "Akash Humarmalekar"}, {"fullName": "Mukesh Magan Vekariya", "followupName": "Pawan Rathod"}, {"fullName": "Neev Umesh Bhalala", "followupName": "Akash Humarmalekar"}, {"fullName": "Nimesh Navinchandra Tailor", "followupName": "Suvas Waghela"}, {"fullName": "Niral Dinesh Darji", "followupName": "Suvas Waghela"}, {"fullName": "Nirmit Manish Gadiya", "followupName": "Yash Kaila"}, {"fullName": "Pawan Hasmukh Rathod", "followupName": "Vinit Hindocha"}, {"fullName": "Piyush Kalu Gajera", "followupName": "Divyesh Meva"}, {"fullName": "Pratham Hitesh Bhatt", "followupName": "Suresh Suthar"}, {"fullName": "Prem Harish Acharya", "followupName": "Aditya Shrotriya"}, {"fullName": "Priyang Amar Trivedi", "followupName": "Suresh Suthar"}, {"fullName": "Rahul Vitthal Savalia", "followupName": "Dhaval Chhaya"}, {"fullName": "Raj Nilish Sarsavadiya", "followupName": "Dhaval Chhaya"}, {"fullName": "Rajesh Mohan Bariya", "followupName": "Dhaval Chhaya"}, {"fullName": "Raju Ashok Joshi", "followupName": "Vinit Hindocha"}, {"fullName": "Rakesh Ashok Katrimani", "followupName": "Aditya Shrotriya"}, {"fullName": "Ratilal Hirji Mistry", "followupName": "Pawan Rathod"}, {"fullName": "Ritesh Suresh Chekhaliya", "followupName": "Suresh Suthar"}, {"fullName": "Rohit Gajraj Rao", "followupName": "Akash Humarmalekar"}, {"fullName": "Rudra Manish Rathod", "followupName": "Bhavyam Bhalala"}, {"fullName": "Rudra Sanjay Bhanushali", "followupName": "Akash Humarmalekar"}, {"fullName": "Sagar Jagu Parmar", "followupName": "Bhavyam Bhalala"}, {"fullName": "Samir Dhiraj Patel", "followupName": "Pawan Rathod"}, {"fullName": "Santosh Bharat Chekhaliya", "followupName": "Dhaval Chhaya"}, {"fullName": "Shaunak sharad kadam", "followupName": "Yash Kaila"}, {"fullName": "Shubh Dilip Bhatt", "followupName": "Suresh Suthar"}, {"fullName": "Shubham Prasad Shetty", "followupName": "Akash Humarmalekar"}, {"fullName": "Siddharth Anant Lonkar", "followupName": "Akash Humarmalekar"}, {"fullName": "Siddharth Karsan Radadiya", "followupName": "Divyesh Meva"}, {"fullName": "Soham Jimesh Chhunchha", "followupName": "Akash Humarmalekar"}, {"fullName": "Sunjay Arjun Ladva", "followupName": "Suvas Waghela"}, {"fullName": "Suresh Damodar Suthar", "followupName": "Vinit Hindocha"}, {"fullName": "Suvas Pravin Waghela", "followupName": "Vinit Hindocha"}, {"fullName": "Tanish Umesh Bhalala", "followupName": "Suresh Suthar"}, {"fullName": "Tirth Kiran Parmar", "followupName": "Aditya Shrotriya"}, {"fullName": "Tushar Amrit Ratda", "followupName": "Bhavyam Bhalala"}, {"fullName": "Tushar Manoj Gupta", "followupName": "Akash Humarmalekar"}, {"fullName": "Tushar Suresh Solanki", "followupName": "Suresh Suthar"}, {"fullName": "Umesh Dhanji Bhalala", "followupName": "Pawan Rathod"}, {"fullName": "Vedant Devang Mehta", "followupName": "Yash Kaila"}, {"fullName": "Veeresh Gaurav Lingayat", "followupName": "Aditya Shrotriya"}, {"fullName": "Vinit Sanjay Hindocha", "followupName": "Vinit Hindocha"}, {"fullName": "Viral Mahesh Makwana", "followupName": "Aditya Shrotriya"}, {"fullName": "Viren Ajit Delkar", "followupName": "Akash Humarmalekar"}, {"fullName": "Vivek Manoj Gupta", "followupName": "Akash Humarmalekar"}, {"fullName": "Yash Hari Soni", "followupName": "Dhaval Chhaya"}, {"fullName": "Yash Jayanti Kaila", "followupName": "Vinit Hindocha"}, {"fullName": "Yogesh Rajesh Kajale", "followupName": "Akash Humarmalekar"}, {"fullName": "Yug Prasad Shetty", "followupName": "Akash Humarmalekar"}, {"fullName": "Mayur Ramesh Makwana", "followupName": "Suvas Waghela"}, {"fullName": "Jay Zalavadia", "followupName": "Aditya Shrotriya"}, {"fullName": "Ronak Solanki", "followupName": "Suresh Suthar"}, {"fullName": "Nageshwar Shankar Nakarakanti", "followupName": "Akash Humarmalekar"}, {"fullName": "Rajat Adalat Yadav", "followupName": "Akash Humarmalekar"}, {"fullName": "Sid Bhupendra Audichya", "followupName": "Akash Humarmalekar"}, {"fullName": "Somya Bhupendra Audichya", "followupName": "Akash Humarmalekar"}];
+// Master yuvak list used to live here as a hardcoded array. It now lives
+// in the "Master" sheet in Google Sheets instead (Column A = Follow-up
+// Name, Column B = Yuvak Name) and is loaded at runtime into the
+// `masterYuvaks` variable declared in the STATE section below — see
+// sheetPull(). Edit the Master sheet directly to add/remove/rename people;
+// this app only ever reads it, so those edits never affect your entries.
 const FOLLOWUPS = ["Aditya Shrotriya", "Akash Humarmalekar", "Bhavesh Rathod", "Bhavyam Bhalala", "Dhaval Chhaya", "Divyesh Meva", "Jay Kawa", "Jay Virani", "Pawan Rathod", "Raju Joshi", "Suresh Suthar", "Suvas Waghela", "Vinit Hindocha", "Yash Kaila"];
 
 /* ======================================================================
@@ -1087,6 +1092,7 @@ const FOLLOWUPS = ["Aditya Shrotriya", "Akash Humarmalekar", "Bhavesh Rathod", "
    ====================================================================== */
 let entries = [];
 let customYuvaks = [];
+let masterYuvaks = [];  // loaded from the "Master" sheet — see sheetPull()
 let storageOk = true;
 let pendingManual = [];        // manual yuvaks added within the current (unsubmitted) form
 let selectedYuvaks = [];       // {fullName, followupName, status, manual}
@@ -1133,8 +1139,10 @@ function flagStorageIssue(){
 async function loadAll(){
   const e = await storageGet('sampark_entries');
   const c = await storageGet('sampark_custom_yuvaks');
+  const m = await storageGet('sampark_master_yuvaks');
   try{ entries = e ? JSON.parse(e) : []; }catch(err){ entries = []; }
   try{ customYuvaks = c ? JSON.parse(c) : []; }catch(err){ customYuvaks = []; }
+  try{ masterYuvaks = m ? JSON.parse(m) : []; }catch(err){ masterYuvaks = []; }
 }
 async function persistEntries(){
   const ok = await storageSet('sampark_entries', JSON.stringify(entries));
@@ -1184,8 +1192,10 @@ async function sheetPull(silent){
     const data = await res.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
     customYuvaks = Array.isArray(data.customYuvaks) ? data.customYuvaks : [];
+    masterYuvaks = Array.isArray(data.masterYuvaks) ? data.masterYuvaks : [];
     await storageSet('sampark_entries', JSON.stringify(entries));
     await storageSet('sampark_custom_yuvaks', JSON.stringify(customYuvaks));
+    await storageSet('sampark_master_yuvaks', JSON.stringify(masterYuvaks));
     updateSyncBtn('on', 'Synced');
     return true;
   }catch(err){
@@ -1310,7 +1320,7 @@ function periodTagShort(){
 /* ======================================================================
    ROSTER / SEARCH HELPERS
    ====================================================================== */
-function allYuvaks(){ return MASTER_YUVAKS.concat(customYuvaks); }
+function allYuvaks(){ return masterYuvaks.concat(customYuvaks); }
 function rosterFor(followupName){ return allYuvaks().filter(y=>y.followupName===followupName); }
 function initialsOf(name){ return name.trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase(); }
 
@@ -1927,7 +1937,7 @@ document.getElementById('entryForm').addEventListener('submit', async (e)=>{
 
   if(pendingManual.length){
     pendingManual.forEach(m=>{
-      if(!customYuvaks.some(c=>c.fullName===m.fullName) && !MASTER_YUVAKS.some(c=>c.fullName===m.fullName)){
+      if(!customYuvaks.some(c=>c.fullName===m.fullName) && !masterYuvaks.some(c=>c.fullName===m.fullName)){
         customYuvaks.push(m);
       }
     });
