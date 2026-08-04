@@ -1078,21 +1078,29 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
 <script>
 /* ======================================================================
    MASTER DATA
+   Loaded from the "Master" sheet in Google Sheets (via sync) — see
+   loadAll()/sheetPull() below. No names are hardcoded here anymore.
    ====================================================================== */
-// Master yuvak list used to live here as a hardcoded array. It now lives
-// in the "Master" sheet in Google Sheets instead (Column A = Follow-up
-// Name, Column B = Yuvak Name) and is loaded at runtime into the
-// `masterYuvaks` variable declared in the STATE section below — see
-// sheetPull(). Edit the Master sheet directly to add/remove/rename people;
-// this app only ever reads it, so those edits never affect your entries.
-const FOLLOWUPS = ["Aditya Shrotriya", "Akash Humarmalekar", "Bhavesh Rathod", "Bhavyam Bhalala", "Dhaval Chhaya", "Divyesh Meva", "Jay Kawa", "Jay Virani", "Pawan Rathod", "Raju Joshi", "Suresh Suthar", "Suvas Waghela", "Vinit Hindocha", "Yash Kaila"];
+let MASTER_YUVAKS = [];
+let FOLLOWUPS = [];
+
+/* Unique follow-up names, in the order they first appear in the master
+   list (so the sheet's row order controls display order). */
+function deriveFollowupsFrom(masterList){
+  const seen = new Set();
+  const out = [];
+  (masterList||[]).forEach(y=>{
+    const f = (y.followupName||'').trim();
+    if(f && !seen.has(f)){ seen.add(f); out.push(f); }
+  });
+  return out;
+}
 
 /* ======================================================================
    STATE
    ====================================================================== */
 let entries = [];
 let customYuvaks = [];
-let masterYuvaks = [];  // loaded from the "Master" sheet — see sheetPull()
 let storageOk = true;
 let pendingManual = [];        // manual yuvaks added within the current (unsubmitted) form
 let selectedYuvaks = [];       // {fullName, followupName, status, manual}
@@ -1142,7 +1150,8 @@ async function loadAll(){
   const m = await storageGet('sampark_master_yuvaks');
   try{ entries = e ? JSON.parse(e) : []; }catch(err){ entries = []; }
   try{ customYuvaks = c ? JSON.parse(c) : []; }catch(err){ customYuvaks = []; }
-  try{ masterYuvaks = m ? JSON.parse(m) : []; }catch(err){ masterYuvaks = []; }
+  try{ MASTER_YUVAKS = m ? JSON.parse(m) : []; }catch(err){ MASTER_YUVAKS = []; }
+  FOLLOWUPS = deriveFollowupsFrom(MASTER_YUVAKS);
 }
 async function persistEntries(){
   const ok = await storageSet('sampark_entries', JSON.stringify(entries));
@@ -1192,10 +1201,12 @@ async function sheetPull(silent){
     const data = await res.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
     customYuvaks = Array.isArray(data.customYuvaks) ? data.customYuvaks : [];
-    masterYuvaks = Array.isArray(data.masterYuvaks) ? data.masterYuvaks : [];
+    MASTER_YUVAKS = Array.isArray(data.masterYuvaks) ? data.masterYuvaks : [];
+    FOLLOWUPS = deriveFollowupsFrom(MASTER_YUVAKS);
     await storageSet('sampark_entries', JSON.stringify(entries));
     await storageSet('sampark_custom_yuvaks', JSON.stringify(customYuvaks));
-    await storageSet('sampark_master_yuvaks', JSON.stringify(masterYuvaks));
+    await storageSet('sampark_master_yuvaks', JSON.stringify(MASTER_YUVAKS));
+    buildFollowupDependentUI();
     updateSyncBtn('on', 'Synced');
     return true;
   }catch(err){
@@ -1320,7 +1331,7 @@ function periodTagShort(){
 /* ======================================================================
    ROSTER / SEARCH HELPERS
    ====================================================================== */
-function allYuvaks(){ return masterYuvaks.concat(customYuvaks); }
+function allYuvaks(){ return MASTER_YUVAKS.concat(customYuvaks); }
 function rosterFor(followupName){ return allYuvaks().filter(y=>y.followupName===followupName); }
 function initialsOf(name){ return name.trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase(); }
 
@@ -1392,10 +1403,24 @@ function combinedSevaDaysCount(followupName, days, refStr){
   return set.size;
 }
 function yuvaksMetList(followupName, days, refStr){
+  // "Met" credit still only comes from entries this follow-up personally
+  // logged, or was explicitly marked joint on (relevantEntries) -- that's
+  // what makes the "Anyone else present with them?" toggle meaningful;
+  // without it, other follow-ups shouldn't get automatic credit just
+  // because they currently own that yuvak's roster slot.
+  // On top of that, results are restricted to yuvaks CURRENTLY on this
+  // follow-up's roster. That second filter is what stops a reassigned
+  // yuvak from lingering in an old follow-up's Met list after their
+  // roster assignment moves to a new follow-up: once they're off the
+  // old follow-up's roster, old entries mentioning them no longer count
+  // toward the old follow-up's report, even though those entries still
+  // happened and still feed globalLastMet()/alert status elsewhere.
+  const roster = new Set(rosterFor(followupName).map(y=>y.fullName));
   const map = new Map();
   relevantEntries(followupName).forEach(e=>{
     if(e.sevaType==='yuva' && withinLastNDays(e.date, days, refStr)){
       (e.yuvaks||[]).forEach(y=>{
+        if(!roster.has(y.fullName)) return;
         const cur = map.get(y.fullName);
         if(!cur || e.date > cur.lastMet) map.set(y.fullName, {fullName:y.fullName, lastMet:e.date});
       });
@@ -1757,9 +1782,6 @@ document.getElementById('periodDateReset').addEventListener('click', ()=>{
    ENTRY FORM
    ====================================================================== */
 const followupSelect = document.getElementById('in-followup');
-FOLLOWUPS.forEach(f=>{
-  const o = document.createElement('option'); o.value = f; o.textContent = f; followupSelect.appendChild(o);
-});
 document.getElementById('in-date').value = todayStr();
 
 function currentFollowup(){ return followupSelect.value; }
@@ -1937,7 +1959,7 @@ document.getElementById('entryForm').addEventListener('submit', async (e)=>{
 
   if(pendingManual.length){
     pendingManual.forEach(m=>{
-      if(!customYuvaks.some(c=>c.fullName===m.fullName) && !masterYuvaks.some(c=>c.fullName===m.fullName)){
+      if(!customYuvaks.some(c=>c.fullName===m.fullName) && !MASTER_YUVAKS.some(c=>c.fullName===m.fullName)){
         customYuvaks.push(m);
       }
     });
@@ -2003,10 +2025,8 @@ function confirmDelete(btn, id){
    DASHBOARD RENDER
    ====================================================================== */
 const indSelect = document.getElementById('individualSelect');
-FOLLOWUPS.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; indSelect.appendChild(o); });
-indSelect.value = FOLLOWUPS[0];
 
-let combinedFollowupSelected = new Set(FOLLOWUPS);
+let combinedFollowupSelected = new Set();
 const combinedFollowupPanels = [
   { list: document.getElementById('combinedFollowupList'), btn: document.getElementById('combinedFollowupBtn'), panel: document.getElementById('combinedFollowupPanel'), filterEl: document.getElementById('combinedFollowupFilter') },
   { list: document.getElementById('combinedMetFollowupList'), btn: document.getElementById('combinedMetFollowupBtn'), panel: document.getElementById('combinedMetFollowupPanel'), filterEl: document.getElementById('combinedMetFollowupFilter') },
@@ -2018,21 +2038,6 @@ function syncCombinedFollowupCheckboxes(){
     p.list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{ cb.checked = combinedFollowupSelected.has(cb.value); });
   });
 }
-
-combinedFollowupPanels.forEach(p=>{
-  FOLLOWUPS.forEach(f=>{
-    const item = document.createElement('label');
-    item.className = 'ms-filter-item';
-    item.innerHTML = `<input type="checkbox" value="${escAttr(f)}" checked> <span>${escHtml(f)}</span>`;
-    item.querySelector('input').addEventListener('change', e=>{
-      if(e.target.checked) combinedFollowupSelected.add(f); else combinedFollowupSelected.delete(f);
-      syncCombinedFollowupCheckboxes();
-      updateCombinedFollowupBtnLabel();
-      renderCombinedReports();
-    });
-    p.list.appendChild(item);
-  });
-});
 
 function updateCombinedFollowupBtnLabel(){
   const n = combinedFollowupSelected.size;
@@ -2079,22 +2084,10 @@ document.querySelectorAll('#combinedSevaTable th.sortable').forEach(th=>{
 });
 
 /* --- combined ALERT report: multi-select follow-up filter + sortable counts --- */
-let combinedAlertFollowupSelected = new Set(FOLLOWUPS);
+let combinedAlertFollowupSelected = new Set();
 const combinedAlertFollowupList = document.getElementById('combinedAlertFollowupList');
 const combinedAlertFollowupBtn = document.getElementById('combinedAlertFollowupBtn');
 const combinedAlertFollowupPanel = document.getElementById('combinedAlertFollowupPanel');
-
-FOLLOWUPS.forEach(f=>{
-  const item = document.createElement('label');
-  item.className = 'ms-filter-item';
-  item.innerHTML = `<input type="checkbox" value="${escAttr(f)}" checked> <span>${escHtml(f)}</span>`;
-  item.querySelector('input').addEventListener('change', e=>{
-    if(e.target.checked) combinedAlertFollowupSelected.add(f); else combinedAlertFollowupSelected.delete(f);
-    updateCombinedAlertFollowupBtnLabel();
-    renderCombinedAlertReport();
-  });
-  combinedAlertFollowupList.appendChild(item);
-});
 
 function updateCombinedAlertFollowupBtnLabel(){
   const n = combinedAlertFollowupSelected.size;
@@ -2137,22 +2130,10 @@ document.querySelectorAll('#combinedAlertTable th.sortable').forEach(th=>{
 });
 
 /* --- weekly consistency: multi-select follow-up filter --- */
-let weeklyConsistencyFollowupSelected = new Set(FOLLOWUPS);
+let weeklyConsistencyFollowupSelected = new Set();
 const weeklyConsistencyFollowupList = document.getElementById('weeklyConsistencyFollowupList');
 const weeklyConsistencyFollowupBtn = document.getElementById('weeklyConsistencyFollowupBtn');
 const weeklyConsistencyFollowupPanel = document.getElementById('weeklyConsistencyFollowupPanel');
-
-FOLLOWUPS.forEach(f=>{
-  const item = document.createElement('label');
-  item.className = 'ms-filter-item';
-  item.innerHTML = `<input type="checkbox" value="${escAttr(f)}" checked> <span>${escHtml(f)}</span>`;
-  item.querySelector('input').addEventListener('change', e=>{
-    if(e.target.checked) weeklyConsistencyFollowupSelected.add(f); else weeklyConsistencyFollowupSelected.delete(f);
-    updateWeeklyConsistencyFollowupBtnLabel();
-    renderWeeklyConsistency();
-  });
-  weeklyConsistencyFollowupList.appendChild(item);
-});
 
 function updateWeeklyConsistencyFollowupBtnLabel(){
   const n = weeklyConsistencyFollowupSelected.size;
@@ -2182,6 +2163,76 @@ document.getElementById('weeklyConsistencyFollowupFilter').querySelectorAll('.ms
     renderWeeklyConsistency();
   });
 });
+
+/* --- rebuild everything that depends on FOLLOWUPS / MASTER_YUVAKS ---
+   Called once at startup after the master roster loads (from cache
+   and/or the Google Sheet), and again any time a fresh sync pulls an
+   updated roster — so editing the "Master" sheet and hitting Sync
+   refreshes the follow-up dropdown, the yuvak search, and every
+   filter checkbox list without needing a page reload. */
+function buildFollowupDependentUI(){
+  // Entry form follow-up select
+  followupSelect.innerHTML = '';
+  FOLLOWUPS.forEach(f=>{
+    const o = document.createElement('option'); o.value = f; o.textContent = f; followupSelect.appendChild(o);
+  });
+
+  // Individual dashboard follow-up select
+  indSelect.innerHTML = '';
+  FOLLOWUPS.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; indSelect.appendChild(o); });
+  indSelect.value = FOLLOWUPS[0] || '';
+
+  // Combined reports: multi-select follow-up filter (3 panels share this state)
+  combinedFollowupSelected = new Set(FOLLOWUPS);
+  combinedFollowupPanels.forEach(p=>{
+    p.list.innerHTML = '';
+    FOLLOWUPS.forEach(f=>{
+      const item = document.createElement('label');
+      item.className = 'ms-filter-item';
+      item.innerHTML = `<input type="checkbox" value="${escAttr(f)}" checked> <span>${escHtml(f)}</span>`;
+      item.querySelector('input').addEventListener('change', e=>{
+        if(e.target.checked) combinedFollowupSelected.add(f); else combinedFollowupSelected.delete(f);
+        syncCombinedFollowupCheckboxes();
+        updateCombinedFollowupBtnLabel();
+        renderCombinedReports();
+      });
+      p.list.appendChild(item);
+    });
+  });
+  updateCombinedFollowupBtnLabel();
+
+  // Combined ALERT report follow-up filter
+  combinedAlertFollowupSelected = new Set(FOLLOWUPS);
+  combinedAlertFollowupList.innerHTML = '';
+  FOLLOWUPS.forEach(f=>{
+    const item = document.createElement('label');
+    item.className = 'ms-filter-item';
+    item.innerHTML = `<input type="checkbox" value="${escAttr(f)}" checked> <span>${escHtml(f)}</span>`;
+    item.querySelector('input').addEventListener('change', e=>{
+      if(e.target.checked) combinedAlertFollowupSelected.add(f); else combinedAlertFollowupSelected.delete(f);
+      updateCombinedAlertFollowupBtnLabel();
+      renderCombinedAlertReport();
+    });
+    combinedAlertFollowupList.appendChild(item);
+  });
+  updateCombinedAlertFollowupBtnLabel();
+
+  // Weekly Consistency report follow-up filter
+  weeklyConsistencyFollowupSelected = new Set(FOLLOWUPS);
+  weeklyConsistencyFollowupList.innerHTML = '';
+  FOLLOWUPS.forEach(f=>{
+    const item = document.createElement('label');
+    item.className = 'ms-filter-item';
+    item.innerHTML = `<input type="checkbox" value="${escAttr(f)}" checked> <span>${escHtml(f)}</span>`;
+    item.querySelector('input').addEventListener('change', e=>{
+      if(e.target.checked) weeklyConsistencyFollowupSelected.add(f); else weeklyConsistencyFollowupSelected.delete(f);
+      updateWeeklyConsistencyFollowupBtnLabel();
+      renderWeeklyConsistency();
+    });
+    weeklyConsistencyFollowupList.appendChild(item);
+  });
+  updateWeeklyConsistencyFollowupBtnLabel();
+}
 
 /* --- week-range ("as of") picker for the Weekly Consistency report only ---
    Fully independent of periodEndDate/periodMode used by the reports above,
@@ -3322,8 +3373,9 @@ function escAttr(s){ return escHtml(s); }
 async function initApp(){
   await loadSheetUrl();
   await loadAll();
+  buildFollowupDependentUI(); // paint immediately with whatever roster is cached on this device
   if(sheetConfigured()){
-    await sheetPull(true);
+    await sheetPull(true); // sheetPull() calls buildFollowupDependentUI() again if the fetch succeeds
   }
   renderRecent();
   renderDashboard();
