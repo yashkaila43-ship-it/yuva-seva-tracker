@@ -807,7 +807,10 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
 
         <div class="field" id="f-otherseva" style="display:none; margin-top:16px;">
           <label for="in-otherseva">Describe the seva</label>
-          <input type="text" id="in-otherseva" placeholder="e.g. Sabha arrangement, kitchen seva…">
+          <div class="search-wrap">
+            <input type="text" id="in-otherseva" placeholder="e.g. Sabha arrangement, kitchen seva…" autocomplete="off">
+            <div id="otherSevaSuggestBox" class="suggest-box"></div>
+          </div>
         </div>
 
         <div class="section-block" id="block-yuva" style="display:none;">
@@ -1865,6 +1868,70 @@ function renderSuggestions(query){
       suggestBox.classList.remove('show');
     });
   }
+}
+
+/* --- other seva description: autofill from past entries --- */
+const otherSevaInput = document.getElementById('in-otherseva');
+const otherSevaSuggestBox = document.getElementById('otherSevaSuggestBox');
+
+otherSevaInput.addEventListener('input', ()=> renderOtherSevaSuggestions(otherSevaInput.value));
+otherSevaInput.addEventListener('focus', ()=> renderOtherSevaSuggestions(otherSevaInput.value));
+document.addEventListener('click', (e)=>{
+  if(!otherSevaSuggestBox.contains(e.target) && e.target!==otherSevaInput) otherSevaSuggestBox.classList.remove('show');
+});
+
+/* Distinct "other seva" descriptions typed so far, de-duped
+   case-insensitively (keeping the first-seen casing), with how many
+   times each was used and the most recent date it was used. */
+function distinctOtherSevaTexts(){
+  const map = new Map();
+  entries.forEach(e=>{
+    if(e.sevaType!=='other') return;
+    const t = (e.otherSevaText||'').trim();
+    if(!t) return;
+    const k = t.toLowerCase();
+    const cur = map.get(k);
+    if(cur){ cur.count++; if(e.date > cur.lastDate) cur.lastDate = e.date; }
+    else map.set(k, {text:t, count:1, lastDate:e.date});
+  });
+  return Array.from(map.values());
+}
+
+function renderOtherSevaSuggestions(query){
+  const q = (query||'').trim().toLowerCase();
+  let list = distinctOtherSevaTexts();
+  if(q){
+    list = list.filter(x=>x.text.toLowerCase().includes(q));
+    list.sort((a,b)=>{
+      const aStarts = a.text.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStarts = b.text.toLowerCase().startsWith(q) ? 0 : 1;
+      if(aStarts!==bStarts) return aStarts-bStarts;
+      if(b.count!==a.count) return b.count-a.count;
+      return a.text.localeCompare(b.text);
+    });
+  }else{
+    list.sort((a,b)=> b.count-a.count || (b.lastDate||'').localeCompare(a.lastDate||''));
+  }
+  list = list.slice(0,8);
+
+  if(!list.length){
+    otherSevaSuggestBox.classList.remove('show');
+    otherSevaSuggestBox.innerHTML = '';
+    return;
+  }
+
+  otherSevaSuggestBox.innerHTML = list.map(x=>`<div class="suggest-item" data-text="${escAttr(x.text)}">
+      <span class="nm">${escHtml(x.text)}</span>${x.count>1?`<span class="badge" style="font-size:11px;color:var(--ink-faint);">${x.count}×</span>`:''}
+    </div>`).join('');
+  otherSevaSuggestBox.classList.add('show');
+
+  otherSevaSuggestBox.querySelectorAll('.suggest-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      otherSevaInput.value = el.dataset.text;
+      otherSevaSuggestBox.classList.remove('show');
+      otherSevaInput.focus();
+    });
+  });
 }
 
 function addYuvakChip(y, manual){
