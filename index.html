@@ -761,7 +761,7 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
       <button class="tab-btn active" data-view="entry">Data Entry</button>
       <button class="tab-btn" data-view="dashboard">Dashboard</button>
     </div>
-    <div id="storageFlag" class="storage-flag"><span class="dot"></span> Working offline — not saved</div>
+    <div id="storageFlag" class="storage-flag"><span class="dot"></span> Not synced — entries are not being saved</div>
     <button type="button" class="logout-btn" id="logoutBtn" title="Log out">Log out</button>
   </div>
 </nav>
@@ -1101,7 +1101,6 @@ function deriveFollowupsFrom(masterList){
    ====================================================================== */
 let entries = [];
 let customYuvaks = [];
-let storageOk = true;
 let pendingManual = [];        // manual yuvaks added within the current (unsubmitted) form
 let selectedYuvaks = [];       // {fullName, followupName, status, manual}
 let selectedJoint = [];        // followup names
@@ -1123,9 +1122,11 @@ let charts = {};
 /* ======================================================================
    STORAGE HELPERS
    ====================================================================== */
-/* Uses the browser's built-in localStorage so entries are saved on THIS
-   computer/browser and are still there the next time this file is opened —
-   no internet or Claude session required. */
+/* No entry data is ever written to this device. localStorage is used only
+   for small non-data config (the configured Sheet URL, the login
+   "remember me" flag) — never for seva entries, custom yuvaks, or the
+   master roster. Those live only in memory and in the Google Sheet, so an
+   entry only counts as "saved" once the Apps Script sync succeeds. */
 async function storageGet(key){
   try{
     if(!window.localStorage) return null;
@@ -1140,29 +1141,28 @@ async function storageSet(key, value){
   }catch(e){ return false; }
 }
 function flagStorageIssue(){
-  storageOk = false;
   document.getElementById('storageFlag').classList.add('show');
+}
+function clearStorageIssue(){
+  document.getElementById('storageFlag').classList.remove('show');
 }
 
 async function loadAll(){
-  const e = await storageGet('sampark_entries');
-  const c = await storageGet('sampark_custom_yuvaks');
-  const m = await storageGet('sampark_master_yuvaks');
-  try{ entries = e ? JSON.parse(e) : []; }catch(err){ entries = []; }
-  try{ customYuvaks = c ? JSON.parse(c) : []; }catch(err){ customYuvaks = []; }
-  try{ MASTER_YUVAKS = m ? JSON.parse(m) : []; }catch(err){ MASTER_YUVAKS = []; }
+  // Nothing to load locally — entries/customYuvaks/MASTER_YUVAKS come only
+  // from the Google Sheet via sheetPull(), called right after this in initApp().
+  entries = [];
+  customYuvaks = [];
+  MASTER_YUVAKS = MASTER_YUVAKS || [];
   FOLLOWUPS = deriveFollowupsFrom(MASTER_YUVAKS);
 }
 async function persistEntries(){
-  const ok = await storageSet('sampark_entries', JSON.stringify(entries));
-  if(!ok) flagStorageIssue();
-  await sheetPush();
+  const ok = await sheetPush();
+  if(ok) clearStorageIssue(); else flagStorageIssue();
   return ok;
 }
 async function persistCustomYuvaks(){
-  const ok = await storageSet('sampark_custom_yuvaks', JSON.stringify(customYuvaks));
-  if(!ok) flagStorageIssue();
-  await sheetPush();
+  const ok = await sheetPush();
+  if(ok) clearStorageIssue(); else flagStorageIssue();
   return ok;
 }
 
@@ -1194,7 +1194,7 @@ function updateSyncBtn(state, text){
 }
 
 async function sheetPull(silent){
-  if(!sheetConfigured()){ updateSyncBtn(null, 'Sync'); return false; }
+  if(!sheetConfigured()){ updateSyncBtn(null, 'Sync'); flagStorageIssue(); return false; }
   try{
     const res = await fetch(sheetUrl, { method:'GET' });
     if(!res.ok) throw new Error('http '+res.status);
@@ -1203,15 +1203,14 @@ async function sheetPull(silent){
     customYuvaks = Array.isArray(data.customYuvaks) ? data.customYuvaks : [];
     MASTER_YUVAKS = Array.isArray(data.masterYuvaks) ? data.masterYuvaks : [];
     FOLLOWUPS = deriveFollowupsFrom(MASTER_YUVAKS);
-    await storageSet('sampark_entries', JSON.stringify(entries));
-    await storageSet('sampark_custom_yuvaks', JSON.stringify(customYuvaks));
-    await storageSet('sampark_master_yuvaks', JSON.stringify(MASTER_YUVAKS));
     buildFollowupDependentUI();
     updateSyncBtn('on', 'Synced');
+    clearStorageIssue();
     return true;
   }catch(err){
     updateSyncBtn('err', 'Sync error');
-    if(!silent) showToast('Could not reach the Google Sheet — using data saved on this device.');
+    flagStorageIssue();
+    if(!silent) showToast('Could not reach the Google Sheet — no data can be loaded or saved until sync is restored.');
     return false;
   }
 }
@@ -1955,20 +1954,40 @@ document.getElementById('entryForm').addEventListener('submit', async (e)=>{
     createdAt: new Date().toISOString()
   };
   entries.unshift(entry);
-  await persistEntries();
+  const entrySynced = await persistEntries();
+  if(!entrySynced){
+    entries.shift(); // roll back — nothing is kept unless the Sheet confirms it
+    showFormMsg('Could not reach the Google Sheet — this entry was NOT saved. Check the connection/Apps Script and try again.', false);
+    return;
+  }
 
+  let customSynced = true;
   if(pendingManual.length){
+    const newlyAdded = [];
     pendingManual.forEach(m=>{
       if(!customYuvaks.some(c=>c.fullName===m.fullName) && !MASTER_YUVAKS.some(c=>c.fullName===m.fullName)){
         customYuvaks.push(m);
+        newlyAdded.push(m);
       }
     });
-    await persistCustomYuvaks();
-    pendingManual = [];
+    if(newlyAdded.length){
+      customSynced = await persistCustomYuvaks();
+      if(customSynced){
+        pendingManual = [];
+      }else{
+        customYuvaks = customYuvaks.filter(c => !newlyAdded.includes(c)); // roll back unsynced additions
+      }
+    }else{
+      pendingManual = [];
+    }
   }
 
-  showFormMsg('Entry saved successfully.', true);
-  showToast('Seva entry logged for '+fmtDate(date));
+  if(customSynced){
+    showFormMsg('Entry saved successfully.', true);
+    showToast('Seva entry logged for '+fmtDate(date));
+  }else{
+    showFormMsg('Entry saved, but the new yuvak name(s) could not sync — please re-add them and retry.', false);
+  }
 
   // reset (keep date & followup for quick repeat entries)
   selectedYuvaks = [];
@@ -2007,10 +2026,16 @@ function renderRecent(){
     btn.addEventListener('click', ()=> confirmDelete(btn, btn.dataset.id));
   });
 }
-function confirmDelete(btn, id){
+async function confirmDelete(btn, id){
   if(btn.dataset.confirming==='1'){
+    const removed = entries.find(e=>e.id===id);
     entries = entries.filter(e=>e.id!==id);
-    persistEntries();
+    const ok = await persistEntries();
+    if(!ok && removed){
+      entries.push(removed); // roll back — deletion didn't sync
+      showToast('Could not reach the Google Sheet — entry was not deleted.');
+      return;
+    }
     renderRecent();
     renderDashboard();
     showToast('Entry deleted.');
@@ -3359,10 +3384,17 @@ document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
 const resetBtn = document.getElementById('resetDataBtn');
 resetBtn.addEventListener('click', async ()=>{
   if(resetBtn.dataset.confirming==='1'){
+    const prevEntries = entries, prevCustom = customYuvaks;
     entries = []; customYuvaks = [];
-    await persistEntries(); await persistCustomYuvaks();
-    renderRecent(); renderDashboard();
+    const ok1 = await persistEntries();
+    const ok2 = await persistCustomYuvaks();
     resetBtn.dataset.confirming='0'; resetBtn.textContent='Clear all data';
+    if(!ok1 || !ok2){
+      entries = prevEntries; customYuvaks = prevCustom; // roll back — clear didn't sync
+      showToast('Could not reach the Google Sheet — data was not cleared.');
+      return;
+    }
+    renderRecent(); renderDashboard();
     showToast('All data cleared.');
   }else{
     resetBtn.dataset.confirming='1';
@@ -3382,10 +3414,12 @@ function escAttr(s){ return escHtml(s); }
    ====================================================================== */
 async function initApp(){
   await loadSheetUrl();
-  await loadAll();
-  buildFollowupDependentUI(); // paint immediately with whatever roster is cached on this device
+  await loadAll(); // resets to empty in-memory state — no entry data is ever cached on this device
+  buildFollowupDependentUI(); // paint an empty shell first
   if(sheetConfigured()){
-    await sheetPull(true); // sheetPull() calls buildFollowupDependentUI() again if the fetch succeeds
+    await sheetPull(true); // pulls the real data from the Sheet; flags the banner if it can't reach it
+  }else{
+    flagStorageIssue();
   }
   renderRecent();
   renderDashboard();
