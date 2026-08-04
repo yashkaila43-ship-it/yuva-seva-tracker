@@ -1082,10 +1082,16 @@ th.week-col-head{color:var(--ink-soft); font-weight:700; white-space:nowrap;}
    loadAll()/sheetPull() below. No names are hardcoded here anymore.
    ====================================================================== */
 let MASTER_YUVAKS = [];
+let MASTER_FOLLOWUPS = [];   // ALL follow-up names from the Master sheet,
+                              // including rows that have a follow-up name
+                              // but no yuvak name yet.
 let FOLLOWUPS = [];
 
 /* Unique follow-up names, in the order they first appear in the master
-   list (so the sheet's row order controls display order). */
+   list (so the sheet's row order controls display order).
+   NOTE: this only sees follow-ups that have at least one yuvak row, since
+   it's derived from MASTER_YUVAKS. It's kept as a fallback for older
+   sync payloads that don't yet include masterFollowups — see sheetPull(). */
 function deriveFollowupsFrom(masterList){
   const seen = new Set();
   const out = [];
@@ -1153,7 +1159,8 @@ async function loadAll(){
   entries = [];
   customYuvaks = [];
   MASTER_YUVAKS = MASTER_YUVAKS || [];
-  FOLLOWUPS = deriveFollowupsFrom(MASTER_YUVAKS);
+  MASTER_FOLLOWUPS = MASTER_FOLLOWUPS || [];
+  FOLLOWUPS = MASTER_FOLLOWUPS.length ? MASTER_FOLLOWUPS : deriveFollowupsFrom(MASTER_YUVAKS);
 }
 async function persistEntries(){
   const ok = await sheetPush();
@@ -1202,7 +1209,12 @@ async function sheetPull(silent){
     entries = Array.isArray(data.entries) ? data.entries : [];
     customYuvaks = Array.isArray(data.customYuvaks) ? data.customYuvaks : [];
     MASTER_YUVAKS = Array.isArray(data.masterYuvaks) ? data.masterYuvaks : [];
-    FOLLOWUPS = deriveFollowupsFrom(MASTER_YUVAKS);
+    // masterFollowups comes from every row in the Master sheet that has a
+    // follow-up name, even if that row has no yuvak name yet. Falls back
+    // to the yuvak-only derivation if the Apps Script hasn't been updated
+    // to send masterFollowups.
+    MASTER_FOLLOWUPS = Array.isArray(data.masterFollowups) ? data.masterFollowups : [];
+    FOLLOWUPS = MASTER_FOLLOWUPS.length ? MASTER_FOLLOWUPS : deriveFollowupsFrom(MASTER_YUVAKS);
     buildFollowupDependentUI();
     updateSyncBtn('on', 'Synced');
     clearStorageIssue();
@@ -1934,7 +1946,6 @@ document.getElementById('entryForm').addEventListener('submit', async (e)=>{
   if(!followupName){ errors.push('Please select a follow-up name.'); document.getElementById('f-followup').classList.add('error'); }
   if(!sevaType){ errors.push('Please choose Yuva Seva or Other Seva.'); document.getElementById('f-sevatype').classList.add('error'); }
   if(sevaType==='other' && !otherSevaText){ errors.push('Please describe the other seva.'); document.getElementById('f-otherseva').classList.add('error'); }
-  if(sevaType==='yuva' && selectedYuvaks.length===0){ errors.push('Please add at least one yuvak that was met.'); }
 
   const errBox = document.getElementById('formErrors');
   if(errors.length){
@@ -2002,7 +2013,10 @@ document.getElementById('entryForm').addEventListener('submit', async (e)=>{
    RECENT ENTRIES
    ====================================================================== */
 function entrySummary(e){
-  if(e.sevaType==='yuva') return (e.yuvaks||[]).map(y=>y.fullName).join(', ');
+  if(e.sevaType==='yuva'){
+    const names = (e.yuvaks||[]).map(y=>y.fullName);
+    return names.length ? names.join(', ') : e.followupName;
+  }
   return e.otherSevaText;
 }
 function renderRecent(){
