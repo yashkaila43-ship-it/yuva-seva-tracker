@@ -2172,10 +2172,20 @@ document.getElementById('weeklyConsistencyFollowupFilter').querySelectorAll('.ms
    filter checkbox list without needing a page reload. */
 function buildFollowupDependentUI(){
   // Entry form follow-up select
+  const prevFollowup = followupSelect.value;
   followupSelect.innerHTML = '';
   FOLLOWUPS.forEach(f=>{
     const o = document.createElement('option'); o.value = f; o.textContent = f; followupSelect.appendChild(o);
   });
+  // Keep whatever follow-up was already selected (if it still exists in the
+  // refreshed roster) instead of silently jumping back to the first name.
+  if(FOLLOWUPS.includes(prevFollowup)) followupSelect.value = prevFollowup;
+  // Rebuild the "Anyone else present with them?" chips against the freshly
+  // synced follow-up list, and drop any previously-selected joint name that
+  // no longer exists (e.g. removed from the Master sheet) or that matches
+  // the currently selected follow-up.
+  selectedJoint = selectedJoint.filter(j=> FOLLOWUPS.includes(j) && j!==currentFollowup());
+  renderJointChips();
 
   // Individual dashboard follow-up select
   indSelect.innerHTML = '';
